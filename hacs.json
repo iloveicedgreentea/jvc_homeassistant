@@ -1,0 +1,8 @@
+{
+    "name": "JVC Projectors",
+    "hacs": "1.6.0",
+    "domains": [
+        "remote"
+    ],
+    "homeassistant": "0.118.0"
+}
