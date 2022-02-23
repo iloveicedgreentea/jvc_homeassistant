@@ -115,15 +115,21 @@ class JVCRemote(RemoteEntity):
 
         return self._state
 
-        # TODO: fix bug with it setting state each time
-
     async def async_turn_on(self, **kwargs):
         """Send the power on command."""
+
+        while self._lock.locked():
+            _LOGGER.debug("State is locked. Waiting to run command")
+            
         async with self._lock:
             return await self.jvc_client.async_power_on()
 
     async def async_turn_off(self, **kwargs):
         """Send the power off command."""
+
+        while self._lock.locked():
+            _LOGGER.debug("State is locked. Waiting to run command")
+
         async with self._lock:
             return await self.jvc_client.async_power_off()
 
@@ -144,11 +150,17 @@ class JVCRemote(RemoteEntity):
     async def async_update(self):
         """Retrieve latest state."""
         # lock to prevent concurrent connections
+        while self._lock.locked():
+            _LOGGER.debug("State is locked. Waiting to run command")
+
         async with self._lock:
             await self._async_collect_updates()
 
     async def async_send_command(self, command: list[str], **kwargs):
         """Send commands to a device."""
+        # Wait until unlocked so commmands dont cause a failure loop
+        while self._lock.locked():
+            _LOGGER.debug("State is locked. Waiting to run command")
 
         async with self._lock:
             return await self.jvc_client.async_exec_command(command)
@@ -157,6 +169,9 @@ class JVCRemote(RemoteEntity):
         """
         Brings up the info screen
         """
+        while self._lock.locked():
+            _LOGGER.debug("State is locked. Waiting to run command")
+
         async with self._lock:
             return await self.jvc_client.async_info()
 
@@ -164,6 +179,9 @@ class JVCRemote(RemoteEntity):
         """
         Sets optimal gaming modes
         """
+        while self._lock.locked():
+            _LOGGER.debug("State is locked. Waiting to run command")
+
         async with self._lock:
             return await self.jvc_client.async_gaming_mode_hdr()
 
@@ -171,6 +189,9 @@ class JVCRemote(RemoteEntity):
         """
         Sets optimal gaming modes
         """
+        while self._lock.locked():
+            _LOGGER.debug("State is locked. Waiting to run command")
+
         async with self._lock:
             return await self.jvc_client.async_gaming_mode_sdr()
 
@@ -178,6 +199,9 @@ class JVCRemote(RemoteEntity):
         """
         Sets optimal HDR modes
         """
+        while self._lock.locked():
+            _LOGGER.debug("State is locked. Waiting to run command")
+
         async with self._lock:
             return await self.jvc_client.async_hdr_picture_mode()
 
@@ -185,5 +209,8 @@ class JVCRemote(RemoteEntity):
         """
         Sets optimal SDR modes
         """
+        while self._lock.locked():
+            _LOGGER.debug("State is locked. Waiting to run command")
+
         async with self._lock:
             return await self.jvc_client.async_sdr_picture_mode()
