@@ -185,8 +185,6 @@ class JVCRemote(RemoteEntity):
             except asyncio.TimeoutError:
                 _LOGGER.error("Timed out getting low latency state")
 
-            except asyncio.CancelledError
-
     async def async_update(self):
         """Retrieve latest state."""
         # lock to prevent concurrent connections
