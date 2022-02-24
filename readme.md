@@ -11,7 +11,14 @@ All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_pr
 * Optimal gaming and movie setting meta-functions
 * and so on 
 
-## Home Assistant Setup
+## Installation
+This is currently only a custom component. Working on getting this into HA Core
+
+Install HACS, then install the component by adding this as a custom repo https://hacs.xyz/docs/faq/custom_repositories
+
+You can also just copy all the files into your custom_components folder but then you won't have automatic updates.
+
+### Home Assistant Setup
 
 ```yaml
 # configuration.yaml
