@@ -1,9 +1,16 @@
 from homeassistant.components.remote import RemoteEntity, PLATFORM_SCHEMA
-from homeassistant.const import CONF_NAME, CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL
+from homeassistant.const import (
+    CONF_NAME,
+    CONF_HOST,
+    CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
+    CONF_TIMEOUT,
+)
 from homeassistant.helpers import entity_platform, config_validation as cv
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from async_timeout import timeout
 from jvc_projector import JVCProjector
 import logging
 import voluptuous as vol
@@ -42,6 +49,8 @@ async def async_setup_platform(
     host = config.get(CONF_HOST)
     name = config.get(CONF_NAME)
     password = config.get(CONF_PASSWORD)
+    # Maybe make this user supplied in the future
+    # timeout = config.get(CONF_TIMEOUT)
     # IF this is not high enough connections will start tripping over each other
     # TODO: implement some kind of global locking
     SCAN_INTERVAL = config.get(CONF_SCAN_INTERVAL)
@@ -75,11 +84,17 @@ class JVCRemote(RemoteEntity):
     Implements the interface for JVC Remote in HA
     """
 
-    def __init__(self, name: str, host: str, password: str) -> None:
+    def __init__(self, name: str, host: str, password: str, timeout: str=None) -> None:
         self._name = name
         self._host = host
-        self.password = password
-        self.jvc_client = JVCProjector(host=host, password=password, logger=_LOGGER)
+        if timeout is None:
+            self.timeout = 5
+        else:
+            self.timeout = int(timeout)
+        # use 5 second timeout, try to prevent error loops
+        self.jvc_client = JVCProjector(
+            host=host, password=password, logger=_LOGGER, connect_timeout=self.timeout
+        )
         self._state = None
         self._ll_state = None
         # Because we can only have one connection at a time, we need to lock every command
@@ -87,8 +102,6 @@ class JVCRemote(RemoteEntity):
 
     @property
     def should_poll(self):
-        # poll the device so we know if it was state changed
-        # via an external method, like the physical remote
         return True
 
     @property
@@ -104,8 +117,14 @@ class JVCRemote(RemoteEntity):
         """
         Return extra state attributes.
         """
-
-        return {"power_state": self._state, "low_latency": self._ll_state}
+        # These are bools. Useful for making sensors
+        return {
+            "power_state": self._state,
+            "low_latency": self._ll_state,
+            "host_ip": self._host,
+            "timeout": self.timeout,
+            "command_in_flight": self._lock.locked(),
+        }
 
     @property
     def is_on(self):
@@ -120,7 +139,7 @@ class JVCRemote(RemoteEntity):
 
         while self._lock.locked():
             _LOGGER.debug("State is locked. Waiting to run command")
-            
+
         async with self._lock:
             return await self.jvc_client.async_power_on()
 
@@ -139,8 +158,28 @@ class JVCRemote(RemoteEntity):
         """
 
         async def run_updates():
-            self._state = await self.jvc_client.async_is_on()
-            self._ll_state = await self.jvc_client.async_get_low_latency_state()
+            # Okay clearly not enough locking
+            while self._lock.locked():
+                _LOGGER.debug("State is locked. Waiting to run command")
+            async with self._lock:
+                # Try to make it so if something is hanging, just end the connection
+                # otherwise it can just lock up the entire integration
+                try:
+                    async with timeout(5):
+                        self._state = await self.jvc_client.async_is_on()
+                except asyncio.TimeoutError:
+                    _LOGGER.error("Timed out getting power state")
+
+            while self._lock.locked():
+                _LOGGER.debug("State is locked. Waiting to run command")
+            async with self._lock:
+                try:
+                    async with timeout(5):
+                        self._ll_state = (
+                            await self.jvc_client.async_get_low_latency_state()
+                        )
+                except asyncio.TimeoutError:
+                    _LOGGER.error("Timed out getting low latency state")
 
         loop = asyncio.get_event_loop()
         task = loop.create_task(run_updates())
