@@ -106,7 +106,7 @@ class JVCRemote(RemoteEntity):
 
     @property
     def should_poll(self):
-        return True
+        return False
 
     @property
     def name(self):
@@ -149,8 +149,6 @@ class JVCRemote(RemoteEntity):
             _, success = await self.jvc_client.async_power_on()
             if success:
                 self._state = True
-            else:
-                self._state = None
 
     async def async_turn_off(self, **kwargs):
         """Send the power off command."""
@@ -163,8 +161,6 @@ class JVCRemote(RemoteEntity):
             _, success = await self.jvc_client.async_power_off()
             if success:
                 self._state = False
-            else:
-                self._state = None
 
     async def _async_collect_updates(self):
         """
@@ -215,11 +211,6 @@ class JVCRemote(RemoteEntity):
 
         async with self._lock:
             _, success = await self.jvc_client.async_exec_command(command)
-            if success:
-                if "power" in command and "on" in command:
-                    self._state = True
-                if "power" in command and "off" in command:
-                    self._state = False
 
     async def service_async_info(self) -> None:
         """
