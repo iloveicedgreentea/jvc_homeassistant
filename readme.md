@@ -3,15 +3,20 @@
 This is the Home Assistant JVC Component implementing my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_improved)
 
 ## Features
+
 All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_improved) including:
-* Power
-* Picture Modes
-* Laser power and dimming
-* Low Latency meta-functions
-* Optimal gaming and movie setting meta-functions
-* and so on 
+
+- Power
+- Picture Modes
+- Laser power and dimming
+- Low Latency meta-functions
+- Optimal gaming and movie setting meta-functions
+- and so on
+
+Because everything is async, it will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. Currently WIP to use one long running connection to have lightning fast commands.
 
 ## Installation
+
 This is currently only a custom component. Working on getting this into HA Core
 
 Install HACS, then install the component by adding this as a custom repo https://hacs.xyz/docs/faq/custom_repositories
@@ -24,13 +29,14 @@ You can also just copy all the files into your custom_components folder but then
 # configuration.yaml
 remote:
   - platform: jvc_projectors
-    name: {friendly name}
-    password: {password}
-    host: {IP addr}
+    name: { friendly name }
+    password: { password }
+    host: { IP addr }
     scan_interval: 30 # recommend 30-60. Power state will poll in this interval
 ```
 
 ## Useful Stuff
+
 I used this to re-create the JVC remote in HA. Add the YAML to your dashboard to get a grid which resembles most of the remote. Other functions can be used via remote.send_command. See the library readme for details.
 
 Add this sensor to your configuration.yml. Replace the nz7 with the name of your entity. Restart HA.
@@ -40,19 +46,20 @@ sensor:
   platform: template
   sensors:
     jvc_low_latency:
-        value_template: >
-            {% if is_state('remote.nz7', 'on') %}
-              {% if states.remote.nz7.attributes.low_latency == false %}
-                Off
-              {% elif states.remote.nz7.attributes.low_latency == true %}
-                On
-              {% endif %}
-            {% else %}
-                Off
-            {% endif %}
+      value_template: >
+        {% if is_state('remote.nz7', 'on') %}
+          {% if states.remote.nz7.attributes.low_latency == false %}
+            Off
+          {% elif states.remote.nz7.attributes.low_latency == true %}
+            On
+          {% endif %}
+        {% else %}
+            Off
+        {% endif %}
 ```
 
 Add this to lovelace
+
 ```yaml
 type: grid
 cards:
@@ -223,5 +230,4 @@ cards:
       action: toggle
     show_icon: false
 columns: 5
-
 ```
