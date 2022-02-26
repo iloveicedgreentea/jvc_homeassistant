@@ -49,10 +49,7 @@ async def async_setup_platform(
     host = config.get(CONF_HOST)
     name = config.get(CONF_NAME)
     password = config.get(CONF_PASSWORD)
-    # Maybe make this user supplied in the future
-    # timeout = config.get(CONF_TIMEOUT)
-    # IF this is not high enough connections will start tripping over each other
-    SCAN_INTERVAL = config.get(CONF_SCAN_INTERVAL)
+
     async_add_entities(
         [
             JVCRemote(name, host, password),
@@ -106,6 +103,8 @@ class JVCRemote(RemoteEntity):
 
     @property
     def should_poll(self):
+        # Polling is disabled as it is unreliable and will lock up commands at the moment
+        # Requires adding stronger locking and command buffering
         return False
 
     @property
@@ -141,73 +140,26 @@ class JVCRemote(RemoteEntity):
     async def async_turn_on(self, **kwargs):
         """Send the power on command."""
 
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to run command")
-        #     await asyncio.sleep(3)
-
         async with self._lock:
-            _, success = await self.jvc_client.async_power_on()
-            if success:
-                self._state = True
+            await self.jvc_client.async_power_on()
+            self._state = True
 
     async def async_turn_off(self, **kwargs):
         """Send the power off command."""
 
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to run command")
-        #     await asyncio.sleep(3)
-
         async with self._lock:
-            _, success = await self.jvc_client.async_power_off()
-            if success:
-                self._state = False
-
-    async def _async_collect_updates(self):
-        """
-        Run each update sequentially. Attributes to update should be added here
-        """
-        # Okay clearly not enough locking
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to get power state")
-        #     await asyncio.sleep(3)
-
-        async with self._lock:
-            # Try to make it so if something is hanging, just end the connection
-            # otherwise it can just lock up the entire integration
-            try:
-                async with timeout(5):
-                    self._state = await self.jvc_client.async_is_on()
-            except asyncio.TimeoutError:
-                _LOGGER.error("Timed out getting power state")
-                return
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to get low latency state")
-        #     await asyncio.sleep(3)
-
-        async with self._lock:
-            try:
-                async with timeout(5):
-                    self._ll_state = await self.jvc_client.async_get_low_latency_state()
-            except asyncio.TimeoutError:
-                _LOGGER.error("Timed out getting low latency state")
-                return
+            await self.jvc_client.async_power_off()
+            self._state = False
 
     async def async_update(self):
         """Retrieve latest state."""
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to run update")
-        #     await asyncio.sleep(3)
-
-        # await self._async_collect_updates()
-        self._state = await self.jvc_client.async_is_on()
+        # Not implemented yet
+        pass
+        # self._state = await self.jvc_client.async_is_on()
         # self._ll_state = await self.jvc_client.async_get_low_latency_state()
 
     async def async_send_command(self, command: list[str], **kwargs):
         """Send commands to a device."""
-        # Wait until unlocked so commmands dont cause a failure loop
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to run command")
-        #     await asyncio.sleep(3)
 
         async with self._lock:
             _, success = await self.jvc_client.async_exec_command(command)
@@ -216,53 +168,42 @@ class JVCRemote(RemoteEntity):
         """
         Brings up the info screen
         """
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to run command")
-        #     await asyncio.sleep(3)
 
         async with self._lock:
-            return await self.jvc_client.async_info()
+            await self.jvc_client.async_info()
 
     async def service_async_gaming_mode_hdr(self) -> None:
         """
         Sets optimal gaming modes
         """
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to run command")
-        #     await asyncio.sleep(3)
 
         async with self._lock:
-            return await self.jvc_client.async_gaming_mode_hdr()
+            await self.jvc_client.async_gaming_mode_hdr()
+            self._ll_state = True
 
     async def service_async_gaming_mode_sdr(self) -> None:
         """
         Sets optimal gaming modes
         """
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to run command")
-        #     await asyncio.sleep(3)
 
         async with self._lock:
-            return await self.jvc_client.async_gaming_mode_sdr()
+            await self.jvc_client.async_gaming_mode_sdr()
+            self._ll_state = True
 
     async def service_async_hdr_picture_mode(self) -> None:
         """
         Sets optimal HDR modes
         """
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to run command")
-        #     await asyncio.sleep(3)
 
         async with self._lock:
-            return await self.jvc_client.async_hdr_picture_mode()
+            await self.jvc_client.async_hdr_picture_mode()
+            self._ll_state = False
 
     async def service_async_sdr_picture_mode(self) -> None:
         """
         Sets optimal SDR modes
         """
-        # if self._lock.locked():
-        #     _LOGGER.debug("State is locked. Waiting to run command")
-        #     await asyncio.sleep(3)
 
         async with self._lock:
-            return await self.jvc_client.async_sdr_picture_mode()
+            await self.jvc_client.async_sdr_picture_mode()
+            self._ll_state = False
