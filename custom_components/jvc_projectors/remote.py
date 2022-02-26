@@ -1,28 +1,24 @@
-from homeassistant.components.remote import RemoteEntity, PLATFORM_SCHEMA
-from homeassistant.const import (
-    CONF_NAME,
-    CONF_HOST,
-    CONF_PASSWORD,
-    CONF_SCAN_INTERVAL,
-    CONF_TIMEOUT,
-)
-from homeassistant.helpers import entity_platform, config_validation as cv
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from async_timeout import timeout
-from jvc_projector import JVCProjector
-import logging
-import voluptuous as vol
+"""Implement JVC component."""
 import asyncio
+from collections.abc import Iterable
+import logging
+
+from jvc_projector import JVCProjector
+import voluptuous as vol
+
+from homeassistant.components.remote import PLATFORM_SCHEMA, RemoteEntity
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv, entity_platform
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from .const import (
-    INFO_COMMAND,
-    HDR_MODE_COMMAND,
-    SDR_MODE_COMMAND,
     GAMING_MODE_HDR_COMMAND,
     GAMING_MODE_SDR_COMMAND,
-    DOMAIN,
+    HDR_MODE_COMMAND,
+    INFO_COMMAND,
+    SDR_MODE_COMMAND,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,9 +39,7 @@ async def async_setup_platform(
     async_add_entities: AddEntitiesCallback,
     discovery_info: DiscoveryInfoType = None,
 ) -> None:
-    """
-    Set up platform.
-    """
+    """Set up platform."""
     host = config.get(CONF_HOST)
     name = config.get(CONF_NAME)
     password = config.get(CONF_PASSWORD)
@@ -76,13 +70,10 @@ async def async_setup_platform(
 
 
 class JVCRemote(RemoteEntity):
-    """
-    Implements the interface for JVC Remote in HA
-    """
+    """Implements the interface for JVC Remote in HA."""
 
-    def __init__(
-        self, name: str, host: str, password: str, timeout: str = None
-    ) -> None:
+    def __init__(self, name, host, password, timeout: str = None) -> None:
+        """JVC Init."""
         self._name = name
         self._host = host
         # Timeout for connections. Everything takes less than 3 seconds to run
@@ -94,8 +85,8 @@ class JVCRemote(RemoteEntity):
         self.jvc_client = JVCProjector(
             host=host, password=password, logger=_LOGGER, connect_timeout=self.timeout
         )
-        self._state = None
-        self._ll_state = None
+        self._state = False
+        self._ll_state = False
         # Because we can only have one connection at a time, we need to lock every command
         # otherwise JVC's server implementation will cancel the running command
         # and just confuse everything, then cause HA to freak out
@@ -103,23 +94,24 @@ class JVCRemote(RemoteEntity):
 
     @property
     def should_poll(self):
+        """Poll."""
         # Polling is disabled as it is unreliable and will lock up commands at the moment
         # Requires adding stronger locking and command buffering
         return False
 
     @property
     def name(self):
+        """Name."""
         return self._name
 
     @property
     def host(self):
+        """Host."""
         return self._host
 
     @property
     def extra_state_attributes(self):
-        """
-        Return extra state attributes.
-        """
+        """Return extra state attributes."""
         # These are bools. Useful for making sensors
         return {
             "power_state": self._state,
@@ -131,9 +123,7 @@ class JVCRemote(RemoteEntity):
 
     @property
     def is_on(self):
-        """
-        Return the last known state of the projector
-        """
+        """Return the last known state of the projector."""
 
         return self._state
 
@@ -154,55 +144,44 @@ class JVCRemote(RemoteEntity):
     async def async_update(self):
         """Retrieve latest state."""
         # Not implemented yet
-        pass
         # self._state = await self.jvc_client.async_is_on()
         # self._ll_state = await self.jvc_client.async_get_low_latency_state()
 
-    async def async_send_command(self, command: list[str], **kwargs):
+    async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
 
         async with self._lock:
-            _, success = await self.jvc_client.async_exec_command(command)
+            await self.jvc_client.async_exec_command(command)
 
     async def service_async_info(self) -> None:
-        """
-        Brings up the info screen
-        """
+        """Bring up the info screen."""
 
         async with self._lock:
             await self.jvc_client.async_info()
 
     async def service_async_gaming_mode_hdr(self) -> None:
-        """
-        Sets optimal gaming modes
-        """
+        """Set optimal gaming modes."""
 
         async with self._lock:
             await self.jvc_client.async_gaming_mode_hdr()
             self._ll_state = True
 
     async def service_async_gaming_mode_sdr(self) -> None:
-        """
-        Sets optimal gaming modes
-        """
+        """Set optimal gaming modes."""
 
         async with self._lock:
             await self.jvc_client.async_gaming_mode_sdr()
             self._ll_state = True
 
     async def service_async_hdr_picture_mode(self) -> None:
-        """
-        Sets optimal HDR modes
-        """
+        """Set optimal HDR modes."""
 
         async with self._lock:
             await self.jvc_client.async_hdr_picture_mode()
             self._ll_state = False
 
     async def service_async_sdr_picture_mode(self) -> None:
-        """
-        Sets optimal SDR modes
-        """
+        """Set optimal SDR modes."""
 
         async with self._lock:
             await self.jvc_client.async_sdr_picture_mode()
