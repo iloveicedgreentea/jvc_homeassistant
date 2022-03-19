@@ -84,18 +84,11 @@ class JVCRemote(RemoteEntity):
         self,
         name: str,
         host: str,
-        password: str,
-        timeout: str = None,
         jvc_client: JVCProjector = None,
     ) -> None:
         """JVC Init."""
         self._name = name
         self._host = host
-        # Timeout for connections. Everything takes less than 3 seconds to run
-        if timeout is None:
-            self.timeout = 5
-        else:
-            self.timeout = int(timeout)
         # use 5 second timeout, try to prevent error loops
         self._state = False
         self._ll_state = False
@@ -103,6 +96,7 @@ class JVCRemote(RemoteEntity):
         # otherwise JVC's server implementation will cancel the running command
         # and just confuse everything, then cause HA to freak out
         self._lock = asyncio.Lock()
+        self.jvc_client = jvc_client
 
     @property
     def should_poll(self):
@@ -129,7 +123,6 @@ class JVCRemote(RemoteEntity):
             "power_state": self._state,
             "low_latency": self._ll_state,
             "host_ip": self._host,
-            "timeout": self.timeout,
         }
 
     @property

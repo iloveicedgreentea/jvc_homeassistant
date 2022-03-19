@@ -13,13 +13,14 @@ All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_pr
 - Optimal gaming and movie setting meta-functions
 - and so on
 
-<!-- Because everything is async, it will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. Currently WIP to use one long running connection to have lightning fast commands. -->
+Because everything is async, it will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. It uses a single persistent connection so any delay you see is because of HA processing.
 
 ## Installation
 
-This is currently only a custom component. Working on getting this into HA Core
+This is currently only a custom component. Unlikely to make it into HA core because their process is just too burdensome.
 
-Install HACS, then install the component by adding this as a custom repo https://hacs.xyz/docs/faq/custom_repositories
+Install HACS, then install the component by adding this as a custom repo
+https://hacs.xyz/docs/faq/custom_repositories
 
 You can also just copy all the files into your custom_components folder but then you won't have automatic updates.
 
@@ -32,8 +33,8 @@ remote:
     name: { friendly name }
     password: { password }
     host: { IP addr }
-    timeout: { seconds }
-    scan_interval: 30 # recommend 30-60. Power state will poll in this interval
+    timeout: { seconds } (optional)
+    scan_interval: 15 # recommend 15-30. Attributes will poll in this interval
 ```
 
 ## Useful Stuff
