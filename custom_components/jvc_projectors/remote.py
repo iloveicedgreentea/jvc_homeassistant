@@ -3,7 +3,7 @@ import asyncio
 from collections.abc import Iterable
 import logging
 
-from jvc_projector import JVCProjector
+from jvc_projector.jvc_projector import JVCProjector
 import voluptuous as vol
 
 from homeassistant.components.remote import PLATFORM_SCHEMA, RemoteEntity
