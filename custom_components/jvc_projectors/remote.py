@@ -149,9 +149,8 @@ class JVCRemote(RemoteEntity):
         """Retrieve latest state."""
         async with self._lock:
             self._state = await self.jvc_client.async_is_on()
-        # TODO: causing deadlock
-        # async with self._lock:
-        #     self._ll_state = await self.jvc_client.async_get_low_latency_state()
+        async with self._lock:
+            self._ll_state = await self.jvc_client.async_get_low_latency_state()
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
