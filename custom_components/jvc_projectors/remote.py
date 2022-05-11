@@ -63,18 +63,6 @@ async def async_setup_platform(
     platform.async_register_entity_service(
         INFO_COMMAND, {}, f"service_async_{INFO_COMMAND}"
     )
-    platform.async_register_entity_service(
-        GAMING_MODE_HDR_COMMAND, {}, f"service_async_{GAMING_MODE_HDR_COMMAND}"
-    )
-    platform.async_register_entity_service(
-        GAMING_MODE_SDR_COMMAND, {}, f"service_async_{GAMING_MODE_SDR_COMMAND}"
-    )
-    platform.async_register_entity_service(
-        HDR_MODE_COMMAND, {}, f"service_async_{HDR_MODE_COMMAND}"
-    )
-    platform.async_register_entity_service(
-        SDR_MODE_COMMAND, {}, f"service_async_{SDR_MODE_COMMAND}"
-    )
 
 
 class JVCRemote(RemoteEntity):
@@ -163,27 +151,3 @@ class JVCRemote(RemoteEntity):
 
         async with self._lock:
             await self.jvc_client.async_info()
-
-    async def service_async_gaming_mode_hdr(self) -> None:
-        """Set optimal gaming modes."""
-
-        async with self._lock:
-            await self.jvc_client.async_gaming_mode_hdr()
-
-    async def service_async_gaming_mode_sdr(self) -> None:
-        """Set optimal gaming modes."""
-
-        async with self._lock:
-            await self.jvc_client.async_gaming_mode_sdr()
-
-    async def service_async_hdr_picture_mode(self) -> None:
-        """Set optimal HDR modes."""
-
-        async with self._lock:
-            await self.jvc_client.async_hdr_picture_mode()
-
-    async def service_async_sdr_picture_mode(self) -> None:
-        """Set optimal SDR modes."""
-
-        async with self._lock:
-            await self.jvc_client.async_sdr_picture_mode()
