@@ -24,6 +24,126 @@ https://hacs.xyz/docs/faq/custom_repositories
 
 You can also just copy all the files into your custom_components folder but then you won't have automatic updates.
 
+### Supported Commands
+
+Note some of the Enums do not match, will fix eventually. You can use these with the second_command service:
+`installation_mode,mode1`
+
+```
+Currently Supported Commands:
+        anamorphic
+        aperture
+        enhance
+        eshift
+        graphic_mode
+        input
+        installation_mode
+        laser_dim
+        laser_power
+        low_latency
+        mask
+        menu
+        motion_enhance
+        picture_mode
+        power
+
+
+Currently Supported Parameters:
+AnamorphicModes
+        off
+        a
+        b
+        c
+ApertureModes
+        off
+        auto1
+        auto2
+EnhanceModes
+        zero
+        one
+        two
+        three
+        four
+        five
+        six
+        seven
+        eight
+        nine
+        ten
+EshiftModes
+        off
+        on
+GraphicModeModes
+        standard
+        hires1
+        hires2
+InputModes
+        hdmi1
+        hdmi2
+LaserDimModes
+        off
+        auto1
+        auto2
+LaserPowerModes
+        low
+        med
+        high
+LowLatencyModes
+        off
+        on
+MaskModes
+        on
+        off
+MemoryModes (installation_mode)
+        mode1
+        mode2
+        mode3
+        mode4
+        mode5
+        mode6
+        mode7
+        mode8
+        mode9
+        mode10
+MenuModes
+        menu
+        up
+        down
+        back
+        left
+        right
+        ok
+MotionEnhanceModes
+        off
+        low
+        high
+PictureModes
+        film
+        cinema
+        natural
+        hdr
+        THX
+        frame_adapt_hdr
+        user1
+        user2
+        user3
+        user4
+        user5
+        user6
+        hlg
+        hdr_plus
+        pana_pq
+PowerModes
+        off
+        on
+PowerStates
+        standby
+        on
+        cooling
+        reserved
+        emergency
+```
+
 ### Home Assistant Setup
 
 ```yaml
