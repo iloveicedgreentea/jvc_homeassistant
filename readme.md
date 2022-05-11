@@ -26,9 +26,6 @@ You can also just copy all the files into your custom_components folder but then
 
 ### Supported Commands
 
-Note some of the Enums do not match, will fix eventually. You can use these with the second_command service:
-`installation_mode,mode1`
-
 ```
 Currently Supported Commands:
         anamorphic
@@ -80,6 +77,17 @@ GraphicModeModes
 InputModes
         hdmi1
         hdmi2
+InstallationModes
+        mode1
+        mode2
+        mode3
+        mode4
+        mode5
+        mode6
+        mode7
+        mode8
+        mode9
+        mode10
 LaserDimModes
         off
         auto1
@@ -94,17 +102,6 @@ LowLatencyModes
 MaskModes
         on
         off
-MemoryModes (installation_mode)
-        mode1
-        mode2
-        mode3
-        mode4
-        mode5
-        mode6
-        mode7
-        mode8
-        mode9
-        mode10
 MenuModes
         menu
         up
