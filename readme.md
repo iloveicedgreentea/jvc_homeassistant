@@ -24,7 +24,10 @@ https://hacs.xyz/docs/faq/custom_repositories
 
 You can also just copy all the files into your custom_components folder but then you won't have automatic updates.
 
-### Supported Commands
+## Supported Commands
+
+`$command,$mode`
+example: "anamorphic,off"
 
 ```
 Currently Supported Commands:
