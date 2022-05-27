@@ -165,7 +165,7 @@ Add this sensor to your configuration.yml. Replace the nz7 with the name of your
 
 ```yaml
 sensor:
-  platform: template
+- platform: template
   sensors:
     jvc_low_latency:
       value_template: >
