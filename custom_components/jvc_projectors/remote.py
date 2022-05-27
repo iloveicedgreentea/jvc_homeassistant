@@ -13,13 +13,7 @@ from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from .const import (
-    GAMING_MODE_HDR_COMMAND,
-    GAMING_MODE_SDR_COMMAND,
-    HDR_MODE_COMMAND,
-    INFO_COMMAND,
-    SDR_MODE_COMMAND,
-)
+from .const import INFO_COMMAND
 
 _LOGGER = logging.getLogger(__name__)
 
