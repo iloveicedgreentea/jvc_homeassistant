@@ -183,6 +183,8 @@ sensor:
 Add this to lovelace
 
 ```yaml
+square: false
+columns: 3
 type: grid
 cards:
   - type: button
@@ -192,17 +194,6 @@ cards:
     show_state: true
     show_name: true
     icon: mdi:power
-  - type: button
-    tap_action:
-      action: call-service
-      service: jvc_projectors.info
-      service_data: {}
-      target:
-        entity_id: remote.nz7
-    show_icon: false
-    name: Info
-    hold_action:
-      action: none
   - type: button
     tap_action:
       action: call-service
@@ -216,23 +207,6 @@ cards:
     icon: mdi:arrow-up
     hold_action:
       action: none
-  - type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu,menu
-      target:
-        entity_id: remote.nz7
-    show_name: true
-    show_icon: false
-    name: Menu
-    hold_action:
-      action: none
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
   - type: button
     tap_action:
       action: none
@@ -253,7 +227,9 @@ cards:
         entity_id: remote.nz7
     show_name: false
     icon: mdi:arrow-left
-  - type: button
+  - show_name: false
+    show_icon: true
+    type: button
     tap_action:
       action: call-service
       service: remote.send_command
@@ -262,7 +238,8 @@ cards:
       target:
         entity_id: remote.nz7
     name: OK
-    show_icon: false
+    icon: mdi:checkbox-blank-circle
+    show_state: true
   - type: button
     tap_action:
       action: call-service
@@ -273,15 +250,6 @@ cards:
         entity_id: remote.nz7
     show_name: false
     icon: mdi:arrow-right
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
-    show_name: false
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
   - type: button
     tap_action:
       action: call-service
@@ -304,54 +272,54 @@ cards:
     icon: mdi:arrow-down
   - type: button
     tap_action:
-      action: toggle
-    show_icon: false
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
-  - type: button
-    tap_action:
       action: call-service
-      service: jvc_projectors.gaming_mode_hdr
-      service_data: {}
+      service: remote.send_command
+      service_data:
+        command: menu,menu
       target:
         entity_id: remote.nz7
-    show_icon: false
     show_name: true
+    show_icon: false
+    name: Menu
     hold_action:
       action: none
-    name: Game HDR
-  - type: button
+  - show_name: true
+    show_icon: true
+    type: button
     tap_action:
       action: call-service
-      service: jvc_projectors.gaming_mode_sdr
-      service_data: {}
+      service: remote.send_command
+      service_data:
+        command: installation_mode,mode5
       target:
         entity_id: remote.nz7
-    show_icon: false
-    name: Game SDR
-  - type: button
+    name: '17:9'
+    icon: mdi:television
+    show_state: false
+  - show_name: true
+    show_icon: true
+    type: button
     tap_action:
       action: call-service
-      service: jvc_projectors.hdr_picture_mode
-      service_data: {}
+      service: remote.send_command
+      service_data:
+        command: installation_mode,mode4
       target:
         entity_id: remote.nz7
-    show_icon: false
-    name: Film HDR
-  - type: button
+    name: 2.4:1
+    icon: mdi:television
+    show_state: false
+  - show_name: true
+    show_icon: true
+    type: button
     tap_action:
       action: call-service
-      service: jvc_projectors.sdr_picture_mode
-      service_data: {}
+      service: remote.send_command
+      service_data:
+        command: installation_mode,mode2
       target:
         entity_id: remote.nz7
-    show_icon: false
-    name: Film SDR
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
-columns: 5
+    name: IMAX
+    icon: mdi:television
+    show_state: false
 ```
