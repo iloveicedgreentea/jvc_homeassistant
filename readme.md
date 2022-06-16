@@ -24,6 +24,126 @@ https://hacs.xyz/docs/faq/custom_repositories
 
 You can also just copy all the files into your custom_components folder but then you won't have automatic updates.
 
+## Supported Commands
+
+`$command,$mode`
+example: "anamorphic,off"
+
+```
+Currently Supported Commands:
+        anamorphic
+        aperture
+        enhance
+        eshift
+        graphic_mode
+        input
+        installation_mode
+        laser_dim
+        laser_power
+        low_latency
+        mask
+        menu
+        motion_enhance
+        picture_mode
+        power
+
+
+Currently Supported Parameters:
+AnamorphicModes
+        off
+        a
+        b
+        c
+ApertureModes
+        off
+        auto1
+        auto2
+EnhanceModes
+        zero
+        one
+        two
+        three
+        four
+        five
+        six
+        seven
+        eight
+        nine
+        ten
+EshiftModes
+        off
+        on
+GraphicModeModes
+        standard
+        hires1
+        hires2
+InputModes
+        hdmi1
+        hdmi2
+InstallationModes
+        mode1
+        mode2
+        mode3
+        mode4
+        mode5
+        mode6
+        mode7
+        mode8
+        mode9
+        mode10
+LaserDimModes
+        off
+        auto1
+        auto2
+LaserPowerModes
+        low
+        med
+        high
+LowLatencyModes
+        off
+        on
+MaskModes
+        on
+        off
+MenuModes
+        menu
+        up
+        down
+        back
+        left
+        right
+        ok
+MotionEnhanceModes
+        off
+        low
+        high
+PictureModes
+        film
+        cinema
+        natural
+        hdr
+        THX
+        frame_adapt_hdr
+        user1
+        user2
+        user3
+        user4
+        user5
+        user6
+        hlg
+        hdr_plus
+        pana_pq
+PowerModes
+        off
+        on
+PowerStates
+        standby
+        on
+        cooling
+        reserved
+        emergency
+```
+
 ### Home Assistant Setup
 
 ```yaml
@@ -45,7 +165,7 @@ Add this sensor to your configuration.yml. Replace the nz7 with the name of your
 
 ```yaml
 sensor:
-  platform: template
+- platform: template
   sensors:
     jvc_low_latency:
       value_template: >
@@ -63,6 +183,8 @@ sensor:
 Add this to lovelace
 
 ```yaml
+square: false
+columns: 3
 type: grid
 cards:
   - type: button
@@ -72,17 +194,6 @@ cards:
     show_state: true
     show_name: true
     icon: mdi:power
-  - type: button
-    tap_action:
-      action: call-service
-      service: jvc_projectors.info
-      service_data: {}
-      target:
-        entity_id: remote.nz7
-    show_icon: false
-    name: Info
-    hold_action:
-      action: none
   - type: button
     tap_action:
       action: call-service
@@ -96,23 +207,6 @@ cards:
     icon: mdi:arrow-up
     hold_action:
       action: none
-  - type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu,menu
-      target:
-        entity_id: remote.nz7
-    show_name: true
-    show_icon: false
-    name: Menu
-    hold_action:
-      action: none
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
   - type: button
     tap_action:
       action: none
@@ -133,7 +227,9 @@ cards:
         entity_id: remote.nz7
     show_name: false
     icon: mdi:arrow-left
-  - type: button
+  - show_name: false
+    show_icon: true
+    type: button
     tap_action:
       action: call-service
       service: remote.send_command
@@ -142,7 +238,8 @@ cards:
       target:
         entity_id: remote.nz7
     name: OK
-    show_icon: false
+    icon: mdi:checkbox-blank-circle
+    show_state: true
   - type: button
     tap_action:
       action: call-service
@@ -153,15 +250,6 @@ cards:
         entity_id: remote.nz7
     show_name: false
     icon: mdi:arrow-right
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
-    show_name: false
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
   - type: button
     tap_action:
       action: call-service
@@ -184,54 +272,54 @@ cards:
     icon: mdi:arrow-down
   - type: button
     tap_action:
-      action: toggle
-    show_icon: false
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
-  - type: button
-    tap_action:
       action: call-service
-      service: jvc_projectors.gaming_mode_hdr
-      service_data: {}
+      service: remote.send_command
+      service_data:
+        command: menu,menu
       target:
         entity_id: remote.nz7
-    show_icon: false
     show_name: true
+    show_icon: false
+    name: Menu
     hold_action:
       action: none
-    name: Game HDR
-  - type: button
+  - show_name: true
+    show_icon: true
+    type: button
     tap_action:
       action: call-service
-      service: jvc_projectors.gaming_mode_sdr
-      service_data: {}
+      service: remote.send_command
+      service_data:
+        command: installation_mode,mode5
       target:
         entity_id: remote.nz7
-    show_icon: false
-    name: Game SDR
-  - type: button
+    name: '17:9'
+    icon: mdi:television
+    show_state: false
+  - show_name: true
+    show_icon: true
+    type: button
     tap_action:
       action: call-service
-      service: jvc_projectors.hdr_picture_mode
-      service_data: {}
+      service: remote.send_command
+      service_data:
+        command: installation_mode,mode4
       target:
         entity_id: remote.nz7
-    show_icon: false
-    name: Film HDR
-  - type: button
+    name: 2.4:1
+    icon: mdi:television
+    show_state: false
+  - show_name: true
+    show_icon: true
+    type: button
     tap_action:
       action: call-service
-      service: jvc_projectors.sdr_picture_mode
-      service_data: {}
+      service: remote.send_command
+      service_data:
+        command: installation_mode,mode2
       target:
         entity_id: remote.nz7
-    show_icon: false
-    name: Film SDR
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
-columns: 5
+    name: IMAX
+    icon: mdi:television
+    show_state: false
 ```
