@@ -13,7 +13,9 @@ from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from .const import INFO_COMMAND
+from .const import (
+    INFO_COMMAND,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
