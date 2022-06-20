@@ -75,7 +75,7 @@ class JVCRemote(RemoteEntity):
         self._host = host
         # use 5 second timeout, try to prevent error loops
         self._state = False
-        self._ll_state = False
+        # self._ll_state = False
         # Because we can only have one connection at a time, we need to lock every command
         # otherwise JVC's server implementation will cancel the running command
         # and just confuse everything, then cause HA to freak out
@@ -105,7 +105,7 @@ class JVCRemote(RemoteEntity):
         # These are bools. Useful for making sensors
         return {
             "power_state": self._state,
-            "low_latency": self._ll_state,
+            # "low_latency": self._ll_state,
             "host_ip": self._host,
         }
 
@@ -133,8 +133,8 @@ class JVCRemote(RemoteEntity):
         """Retrieve latest state."""
         async with self._lock:
             self._state = await self.jvc_client.async_is_on()
-        async with self._lock:
-            self._ll_state = await self.jvc_client.async_get_low_latency_state()
+        # async with self._lock:
+        #     self._ll_state = await self.jvc_client.async_get_low_latency_state()
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
