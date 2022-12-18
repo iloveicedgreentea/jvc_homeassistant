@@ -40,6 +40,22 @@ remote:
 
 You can use the attributes in sensors, automations, etc.
 
+### Adding attributes as sensors
+
+replace nz7 with the name of your remote entity
+```yaml
+sensor:
+  platform: template
+  sensors:
+    jvc_installation_mode:
+        value_template: >
+            {% if is_state('remote.nz7', 'on') %}
+              {{ states.remote.nz7.attributes.installation_mode }}
+            {% else %}
+                Off
+            {% endif %}
+```
+
 ## Usage
 
 Use the `remote.send_command` service to send commands to the projector. 
