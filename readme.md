@@ -9,25 +9,45 @@ All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_pr
 - Power
 - Picture Modes
 - Laser power and dimming
-- Low Latency meta-functions
-- Optimal gaming and movie setting meta-functions
+- Pretty much every major JVC command
+- Attributes for current settings like power state, picture mode, laser mode, input, etc
 - and so on
 
-Because everything is async, it will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. It uses a single persistent connection so any delay you see is because of HA processing.
+Because everything is async, it will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. It uses a single persistent connection so any delay you see is because of their menu processing. In my experience it is just as fast as IR control.
 
 ## Installation
 
-This is currently only a custom component. Unlikely to make it into HA core because their process is just too burdensome.
+This is currently only a custom component. Unlikely to make it into HA core because their process is just too burdensome and I strongly disagree with their deployment model for integrations.
 
 Install HACS, then install the component by adding this as a custom repo
 https://hacs.xyz/docs/faq/custom_repositories
 
-You can also just copy all the files into your custom_components folder but then you won't have automatic updates.
+You can also just copy all the files into your custom_components folder but then you won't get automatic updates.
 
-## Supported Commands
 
-`$command,$mode`
+### Home Assistant Setup
+
+```yaml
+# configuration.yaml
+remote:
+  - platform: jvc_projectors
+    name: { friendly name }
+    password: { password }
+    host: { IP addr }
+    timeout: { seconds } (optional)
+    scan_interval: 15 # recommend 15-30. Attributes will poll in this interval
+```
+
+You can use the attributes in sensors, automations, etc.
+
+## Usage
+
+Use the `remote.send_command` service to send commands to the projector. 
+
+`$command,$parameter`
 example: "anamorphic,off"
+example: "anamorphic,d"
+example: "laser_dim,auto3"
 
 ```
 Currently Supported Commands:
@@ -54,6 +74,7 @@ AnamorphicModes
         a
         b
         c
+        d
 ApertureModes
         off
         auto1
@@ -95,6 +116,7 @@ LaserDimModes
         off
         auto1
         auto2
+        auto3
 LaserPowerModes
         low
         med
@@ -124,6 +146,9 @@ PictureModes
         hdr
         THX
         frame_adapt_hdr
+        frame_adapt_hdr2
+        frame_adapt_hdr3
+        filmmaker
         user1
         user2
         user3
@@ -142,19 +167,6 @@ PowerStates
         cooling
         reserved
         emergency
-```
-
-### Home Assistant Setup
-
-```yaml
-# configuration.yaml
-remote:
-  - platform: jvc_projectors
-    name: { friendly name }
-    password: { password }
-    host: { IP addr }
-    timeout: { seconds } (optional)
-    scan_interval: 15 # recommend 15-30. Attributes will poll in this interval
 ```
 
 ## Useful Stuff
