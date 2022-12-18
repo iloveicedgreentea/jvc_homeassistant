@@ -112,8 +112,13 @@ class JVCRemote(RemoteEntity):
         # These are bools. Useful for making sensors
         return {
             "power_state": self._state,
-            # "low_latency": self._ll_state,
-            "host_ip": self._host,
+            "installation_mode": self._installation_mode,
+            "input_mode": self._input_mode,
+            "laser_mode": self._laser_mode, 
+            "eshift": self._eshift, 
+            "color_mode": self._color_mode,
+            "input_level": self._input_level,
+            "low_latency": self._lowlatency_enabled
         }
 
     @property
@@ -138,16 +143,14 @@ class JVCRemote(RemoteEntity):
 
     async def async_update(self):
         """Retrieve latest state."""
-        loop = asyncio.get_event_loop()
-        
-        self._lowlatency_enabled = loop.run_until_complete(self.jvc_client.async_get_low_latency_state())
-        self._installation_mode = loop.run_until_complete(self.jvc_client.async_get_install_mode())
-        self._input_mode = loop.run_until_complete(self.jvc_client.async_get_input_mode())
-        self._laser_mode = loop.run_until_complete(self.jvc_client.async_get_laser_mode())
-        self._eshift = loop.run_until_complete(self.jvc_client.async_get_eshift_mode())
-        self._color_mode = loop.run_until_complete(self.jvc_client.async_get_color_mode())
-        self._input_level = loop.run_until_complete(self.jvc_client.async_get_input_level())
-        self._state = loop.run_until_complete(self.jvc_client.async_is_on())       
+        self._lowlatency_enabled = await self.jvc_client.async_get_low_latency_state()
+        self._installation_mode = await self.jvc_client.async_get_install_mode()
+        self._input_mode = await self.jvc_client.async_get_input_mode()
+        self._laser_mode = await self.jvc_client.async_get_laser_mode()
+        self._eshift = await self.jvc_client.async_get_eshift_mode()
+        self._color_mode = await self.jvc_client.async_get_color_mode()
+        self._input_level = await self.jvc_client.async_get_input_level()
+        self._state = await self.jvc_client.async_is_on()
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
