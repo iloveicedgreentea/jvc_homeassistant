@@ -4,7 +4,7 @@
   "config_flow": false,
   "documentation": "https://www.home-assistant.io/integrations/jvc_projector",
   "requirements": [
-    "jvc-projector-remote-improved2==3.0.0"
+    "jvc-projector-remote-improved2==3.1.0"
   ],
   "ssdp": [],
   "zeroconf": [],
@@ -14,5 +14,5 @@
     "@iloveicedgreentea"
   ],
   "iot_class": "local_polling",
-  "version": "3.0.1"
+  "version": "3.1.0"
 }
