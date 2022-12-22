@@ -135,7 +135,7 @@ class JVCRemote(RemoteEntity):
         self._state = self.jvc_client.is_on()
 
         if self._state:
-            self._lowlatency_enabled = self.jvc_client.is_ll_on()()
+            self._lowlatency_enabled = self.jvc_client.is_ll_on()
         
             self._installation_mode = self.jvc_client.get_install_mode()
         
