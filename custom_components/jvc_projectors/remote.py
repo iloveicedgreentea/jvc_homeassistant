@@ -53,13 +53,6 @@ def setup_platform(
         ]
     )
 
-    platform = entity_platform.get_current_platform()
-    # Register the services
-    platform.register_entity_service(
-        INFO_COMMAND, {}, f"service_{INFO_COMMAND}"
-    )
-
-
 class JVCRemote(RemoteEntity):
     """Implements the interface for JVC Remote in HA."""
 
@@ -139,9 +132,10 @@ class JVCRemote(RemoteEntity):
 
     def update(self):
         """Retrieve latest state."""
+        self._state = self.jvc_client.is_on()
+
         if self._state:
-        
-            self._lowlatency_enabled = self.jvc_client.get_low_latency_state()
+            self._lowlatency_enabled = self.jvc_client.is_ll_on()()
         
             self._installation_mode = self.jvc_client.get_install_mode()
         
@@ -153,9 +147,7 @@ class JVCRemote(RemoteEntity):
         
             self._color_mode = self.jvc_client.get_color_mode()
         
-            self._input_level = self.jvc_client.get_input_level()
-        
-            self._state = self.jvc_client.is_on()
+            self._input_level = self.jvc_client.get_input_level()  
 
     def send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
