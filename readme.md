@@ -9,11 +9,11 @@ All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_pr
 - Power
 - Picture Modes
 - Laser power and dimming
-- Pretty much every major JVC command
-- Attributes for current settings like power state, picture mode, laser mode, input, etc
+- Pretty much every JVC command
+- HA Attributes for current settings like power state, picture mode, laser mode, input, etc
 - and so on
 
-Because everything is async, it will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. It uses a single persistent connection so any delay you see is because of their menu processing. In my experience it is just as fast as IR control.
+It will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. It uses a single persistent connection so any delay you see is because of their menu processing. In my experience it is noticably faster than IR control, ex. I can run about 10 commands per second.
 
 ## Installation
 
@@ -23,7 +23,6 @@ Install HACS, then install the component by adding this as a custom repo
 https://hacs.xyz/docs/faq/custom_repositories
 
 You can also just copy all the files into your custom_components folder but then you won't get automatic updates.
-
 
 ### Home Assistant Setup
 
@@ -85,17 +84,17 @@ Currently Supported Commands:
 
 
 Currently Supported Parameters:
-AnamorphicModes
+anamorphic:
         off
         a
         b
         c
         d
-ApertureModes
+aperture:
         off
         auto1
         auto2
-EnhanceModes
+enhance:
         zero
         one
         two
@@ -107,17 +106,17 @@ EnhanceModes
         eight
         nine
         ten
-EshiftModes
+eshift:
         off
         on
-GraphicModeModes
+graphic_mode:
         standard
         hires1
         hires2
-InputModes
+input:
         hdmi1
         hdmi2
-InstallationModes
+installation_mode:
         mode1
         mode2
         mode3
@@ -128,22 +127,22 @@ InstallationModes
         mode8
         mode9
         mode10
-LaserDimModes
+laser_dim:
         off
         auto1
         auto2
         auto3
-LaserPowerModes
+laser_power:
         low
         med
         high
-LowLatencyModes
+low_latency:
         off
         on
-MaskModes
+mask:
         on
         off
-MenuModes
+menu:
         menu
         up
         down
@@ -151,11 +150,11 @@ MenuModes
         left
         right
         ok
-MotionEnhanceModes
+motion_enhance:
         off
         low
         high
-PictureModes
+picture_mode:
         film
         cinema
         natural
@@ -174,15 +173,9 @@ PictureModes
         hlg
         hdr_plus
         pana_pq
-PowerModes
+power:
         off
         on
-PowerStates
-        standby
-        on
-        cooling
-        reserved
-        emergency
 ```
 
 ## Useful Stuff
