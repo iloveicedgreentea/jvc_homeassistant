@@ -1,5 +1,4 @@
 """Implement JVC component."""
-import asyncio
 from collections.abc import Iterable
 import logging
 
@@ -30,10 +29,10 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
-async def async_setup_platform(
+def setup_platform(
     hass: HomeAssistant,
     config: ConfigType,
-    async_add_entities: AddEntitiesCallback,
+    add_entities: AddEntitiesCallback,
     discovery_info: DiscoveryInfoType = None,
 ) -> None:
     """Set up platform."""
@@ -47,19 +46,12 @@ async def async_setup_platform(
         connect_timeout=config.get(CONF_TIMEOUT),
     )
     # create a long lived connection
-    await jvc_client.async_open_connection()
-    async_add_entities(
+    jvc_client.open_connection()
+    add_entities(
         [
             JVCRemote(name, host, jvc_client),
         ]
     )
-
-    platform = entity_platform.async_get_current_platform()
-    # Register the services
-    platform.async_register_entity_service(
-        INFO_COMMAND, {}, f"service_async_{INFO_COMMAND}"
-    )
-
 
 class JVCRemote(RemoteEntity):
     """Implements the interface for JVC Remote in HA."""
@@ -85,7 +77,6 @@ class JVCRemote(RemoteEntity):
         # Because we can only have one connection at a time, we need to lock every command
         # otherwise JVC's server implementation will cancel the running command
         # and just confuse everything, then cause HA to freak out
-        self._lock = asyncio.Lock()
         self.jvc_client = jvc_client
 
     @property
@@ -109,13 +100,13 @@ class JVCRemote(RemoteEntity):
     @property
     def extra_state_attributes(self):
         """Return extra state attributes."""
-        # These are bools. Useful for making sensors
+        # Useful for making sensors
         return {
             "power_state": self._state,
             "installation_mode": self._installation_mode,
             "input_mode": self._input_mode,
-            "laser_mode": self._laser_mode, 
-            "eshift": self._eshift, 
+            "laser_mode": self._laser_mode,
+            "eshift": self._eshift,
             "color_mode": self._color_mode,
             "input_level": self._input_level,
             "low_latency": self._lowlatency_enabled
@@ -127,49 +118,43 @@ class JVCRemote(RemoteEntity):
 
         return self._state
 
-    async def async_turn_on(self, **kwargs):
+    def turn_on(self, **kwargs):
         """Send the power on command."""
 
-        async with self._lock:
-            await self.jvc_client.async_power_on()
-            self._state = True
+        self.jvc_client.power_on()
+        self._state = True
 
-    async def async_turn_off(self, **kwargs):
+    def turn_off(self, **kwargs):
         """Send the power off command."""
 
-        async with self._lock:
-            await self.jvc_client.async_power_off()
-            self._state = False
+        self.jvc_client.power_off()
+        self._state = False
 
-    async def async_update(self):
+    def update(self):
         """Retrieve latest state."""
-        if self._state:
-            async with self._lock:
-                self._lowlatency_enabled = await self.jvc_client.async_get_low_latency_state()
-            async with self._lock:
-                self._installation_mode = await self.jvc_client.async_get_install_mode()
-            async with self._lock:
-                self._input_mode = await self.jvc_client.async_get_input_mode()
-            async with self._lock:
-                self._laser_mode = await self.jvc_client.async_get_laser_mode()
-            async with self._lock:
-                self._eshift = await self.jvc_client.async_get_eshift_mode()
-            async with self._lock:
-                self._color_mode = await self.jvc_client.async_get_color_mode()
-            async with self._lock:
-                self._input_level = await self.jvc_client.async_get_input_level()
-            
-        async with self._lock:
-            self._state = await self.jvc_client.async_is_on()
+        self._state = self.jvc_client.is_on()
 
-    async def async_send_command(self, command: Iterable[str], **kwargs):
+        if self._state:
+            self._lowlatency_enabled = self.jvc_client.is_ll_on()()
+        
+            self._installation_mode = self.jvc_client.get_install_mode()
+        
+            self._input_mode = self.jvc_client.get_input_mode()
+        
+            self._laser_mode = self.jvc_client.get_laser_mode()
+        
+            self._eshift = self.jvc_client.get_eshift_mode()
+        
+            self._color_mode = self.jvc_client.get_color_mode()
+        
+            self._input_level = self.jvc_client.get_input_level()  
+
+    def send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
 
-        async with self._lock:
-            await self.jvc_client.async_exec_command(command)
+        self.jvc_client.exec_command(command)
 
-    async def service_async_info(self) -> None:
+    def service_info(self) -> None:
         """Bring up the info screen."""
 
-        async with self._lock:
-            await self.jvc_client.async_info()
+        self.jvc_client.info()
