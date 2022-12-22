@@ -100,13 +100,13 @@ class JVCRemote(RemoteEntity):
     @property
     def extra_state_attributes(self):
         """Return extra state attributes."""
-        # These are bools. Useful for making sensors
+        # Useful for making sensors
         return {
             "power_state": self._state,
             "installation_mode": self._installation_mode,
             "input_mode": self._input_mode,
-            "laser_mode": self._laser_mode, 
-            "eshift": self._eshift, 
+            "laser_mode": self._laser_mode,
+            "eshift": self._eshift,
             "color_mode": self._color_mode,
             "input_level": self._input_level,
             "low_latency": self._lowlatency_enabled
