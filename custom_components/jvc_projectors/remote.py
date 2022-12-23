@@ -136,25 +136,14 @@ class JVCRemote(RemoteEntity):
 
         if self._state:
             self._lowlatency_enabled = self.jvc_client.is_ll_on()
-        
             self._installation_mode = self.jvc_client.get_install_mode()
-        
             self._input_mode = self.jvc_client.get_input_mode()
-        
             self._laser_mode = self.jvc_client.get_laser_mode()
-        
             self._eshift = self.jvc_client.get_eshift_mode()
-        
             self._color_mode = self.jvc_client.get_color_mode()
-        
-            self._input_level = self.jvc_client.get_input_level()  
+            self._input_level = self.jvc_client.get_input_level()
 
     def send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
 
         self.jvc_client.exec_command(command)
-
-    def service_info(self) -> None:
-        """Bring up the info screen."""
-
-        self.jvc_client.info()
