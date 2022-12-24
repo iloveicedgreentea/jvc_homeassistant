@@ -78,6 +78,7 @@ class JVCRemote(RemoteEntity):
         # otherwise JVC's server implementation will cancel the running command
         # and just confuse everything, then cause HA to freak out
         self.jvc_client = jvc_client
+        self._model_family = ""
 
     @property
     def should_poll(self):
@@ -109,7 +110,8 @@ class JVCRemote(RemoteEntity):
             "eshift": self._eshift,
             "color_mode": self._color_mode,
             "input_level": self._input_level,
-            "low_latency": self._lowlatency_enabled
+            "low_latency": self._lowlatency_enabled,
+            "model_family": self._model_family
         }
 
     @property
@@ -138,10 +140,13 @@ class JVCRemote(RemoteEntity):
             self._lowlatency_enabled = self.jvc_client.is_ll_on()
             self._installation_mode = self.jvc_client.get_install_mode()
             self._input_mode = self.jvc_client.get_input_mode()
-            self._laser_mode = self.jvc_client.get_laser_mode()
-            self._eshift = self.jvc_client.get_eshift_mode()
             self._color_mode = self.jvc_client.get_color_mode()
             self._input_level = self.jvc_client.get_input_level()
+            self._eshift = self.jvc_client.get_eshift_mode()
+
+            # Only look at laser for NZ
+            if "NZ" in self._model_family:
+                self._laser_mode = self.jvc_client.get_laser_mode()
 
     def send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
