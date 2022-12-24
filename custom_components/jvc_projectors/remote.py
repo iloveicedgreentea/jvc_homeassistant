@@ -78,7 +78,7 @@ class JVCRemote(RemoteEntity):
         # otherwise JVC's server implementation will cancel the running command
         # and just confuse everything, then cause HA to freak out
         self.jvc_client = jvc_client
-        self._model_family = ""
+        self._model_family = self.jvc_client.model_family
 
     @property
     def should_poll(self):
