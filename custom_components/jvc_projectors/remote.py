@@ -106,8 +106,8 @@ class JVCRemote(RemoteEntity):
             "power_state": self._state,
             "installation_mode": self._installation_mode,
             "input_mode": self._input_mode,
-            "laser_mode": self._laser_mode,
-            "eshift": self._eshift,
+            "laser_mode": self._laser_mode if "NZ" in self._model_family else "Unsupported",
+            "eshift": self._eshift if "NZ" in self._model_family else "Unsupported",
             "color_mode": self._color_mode,
             "input_level": self._input_level,
             "low_latency": self._lowlatency_enabled,
@@ -142,11 +142,12 @@ class JVCRemote(RemoteEntity):
             self._input_mode = self.jvc_client.get_input_mode()
             self._color_mode = self.jvc_client.get_color_mode()
             self._input_level = self.jvc_client.get_input_level()
-            self._eshift = self.jvc_client.get_eshift_mode()
 
             # Only look at laser for NZ
             if "NZ" in self._model_family:
                 self._laser_mode = self.jvc_client.get_laser_mode()
+                # Some non-nz models support this but some don't, so easier to just not check
+                self._eshift = self.jvc_client.get_eshift_mode()
 
     def send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
