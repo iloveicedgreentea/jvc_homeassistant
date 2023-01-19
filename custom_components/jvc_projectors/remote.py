@@ -53,6 +53,7 @@ def setup_platform(
         ]
     )
 
+
 class JVCRemote(RemoteEntity):
     """Implements the interface for JVC Remote in HA."""
 
@@ -75,6 +76,9 @@ class JVCRemote(RemoteEntity):
         self._eshift = ""
         self._color_mode = ""
         self._input_level = ""
+        self._content_type = ""
+        self._hdr_processing = ""
+        self._theater_optimizer = ""
         # Because we can only have one connection at a time, we need to lock every command
         # otherwise JVC's server implementation will cancel the running command
         # and just confuse everything, then cause HA to freak out
@@ -84,9 +88,6 @@ class JVCRemote(RemoteEntity):
     @property
     def should_poll(self):
         """Poll."""
-#       
-        # Polling is disabled as it is unreliable and will lock up commands at the moment
-        # Requires adding stronger locking and command buffering
         return True
 
     @property
@@ -105,15 +106,26 @@ class JVCRemote(RemoteEntity):
         # Useful for making sensors
         return {
             "power_state": self._state,
-            "installation_mode": self._installation_mode,
             "picture_mode": self._picture_mode,
-            "input_mode": self._input_mode,
-            "laser_mode": self._laser_mode if "NZ" in self._model_family else "Unsupported",
-            "eshift": self._eshift if "NZ" in self._model_family else "Unsupported",
-            "color_mode": self._color_mode,
-            "input_level": self._input_level,
+            "installation_mode": self._installation_mode,
+            "content_type": "Unsupported"
+            if "NX" in self._model_family
+            else self._content_type,
+            "hdr_processing": "Unsupported"
+            if "NX" in self._model_family
+            else self._hdr_processing,
+            "theater_optimizer": "Unsupported"
+            if "NX" in self._model_family
+            else "on" in self._theater_optimizer,
             "low_latency": self._lowlatency_enabled,
-            "model_family": self._model_family
+            "input_mode": self._input_mode,
+            "laser_mode": self._laser_mode
+            if "NZ" in self._model_family
+            else "Unsupported",
+            "input_level": self._input_level,
+            "color_mode": self._color_mode,
+            "eshift": self._eshift if "NZ" in self._model_family else "Unsupported",
+            "model_family": self._model_family,
         }
 
     @property
@@ -148,6 +160,9 @@ class JVCRemote(RemoteEntity):
 
             # Only look at laser for NZ
             if "NZ" in self._model_family:
+                self._content_type = self.jvc_client.get_content_type()
+                self._hdr_processing = self.jvc_client.get_hdr_processing()
+                self._theater_optimizer = self.jvc_client.get_theater_optimizer_state()
                 self._laser_mode = self.jvc_client.get_laser_mode()
                 # Some non-nz models support this but some don't, so easier to just not check
                 self._eshift = self.jvc_client.get_eshift_mode()
