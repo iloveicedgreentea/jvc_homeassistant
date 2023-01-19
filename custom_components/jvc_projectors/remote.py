@@ -69,6 +69,7 @@ class JVCRemote(RemoteEntity):
         self._state = False
         self._lowlatency_enabled = False
         self._installation_mode = ""
+        self._picture_mode = ""
         self._input_mode = ""
         self._laser_mode = ""
         self._eshift = ""
@@ -105,6 +106,7 @@ class JVCRemote(RemoteEntity):
         return {
             "power_state": self._state,
             "installation_mode": self._installation_mode,
+            "picture_mode": self._picture_mode,
             "input_mode": self._input_mode,
             "laser_mode": self._laser_mode if "NZ" in self._model_family else "Unsupported",
             "eshift": self._eshift if "NZ" in self._model_family else "Unsupported",
@@ -142,6 +144,7 @@ class JVCRemote(RemoteEntity):
             self._input_mode = self.jvc_client.get_input_mode()
             self._color_mode = self.jvc_client.get_color_mode()
             self._input_level = self.jvc_client.get_input_level()
+            self._picture_mode = self.jvc_client.get_picture_mode()
 
             # Only look at laser for NZ
             if "NZ" in self._model_family:
