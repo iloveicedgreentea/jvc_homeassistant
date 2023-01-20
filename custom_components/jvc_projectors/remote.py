@@ -152,6 +152,7 @@ class JVCRemote(RemoteEntity):
             "picture_mode": self._picture_mode,
             "low_latency": self._lowlatency_enabled,
             "input_mode": self._input_mode,
+            "lamp_power": self._lamp_power,
             "input_level": self._input_level,
             "color_mode": self._color_mode,
             "installation_mode": self._installation_mode,
