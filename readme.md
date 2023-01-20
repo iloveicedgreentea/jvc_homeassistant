@@ -30,10 +30,10 @@ You can also just copy all the files into your custom_components folder but then
 # configuration.yaml
 remote:
   - platform: jvc_projectors
-    name: { friendly name }
-    password: { password }
+    name: { entity name }
+    password: { password } (optional for non-NZ)
     host: { IP addr }
-    timeout: { seconds } (optional)
+    timeout: { seconds } (optional defaults to 3)
     scan_interval: 15 # recommend 15-30. Attributes will poll in this interval
 ```
 
