@@ -6,7 +6,7 @@ from jvc_projector.jvc_projector import JVCProjector
 import voluptuous as vol
 
 from homeassistant.components.remote import PLATFORM_SCHEMA, RemoteEntity
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_TIMEOUT
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_TIMEOUT, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -24,7 +24,8 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Required(CONF_NAME): cv.string,
         vol.Required(CONF_HOST): cv.string,
         vol.Optional(CONF_PASSWORD): cv.string,
-        vol.Optional(CONF_TIMEOUT): cv.string,
+        vol.Required(CONF_SCAN_INTERVAL): cv.time_period,
+        vol.Optional(CONF_TIMEOUT): cv.positive_int,
     }
 )
 
@@ -43,7 +44,7 @@ def setup_platform(
         host=host,
         password=password,
         logger=_LOGGER,
-        connect_timeout=config.get(CONF_TIMEOUT),
+        connect_timeout=int(config.get(CONF_TIMEOUT, 3)),
     )
     # create a long lived connection
     jvc_client.open_connection()
