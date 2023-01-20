@@ -164,13 +164,13 @@ class JVCRemote(RemoteEntity):
 
         return self._state
 
-    def turn_on(self):
+    def turn_on(self, **kwargs):
         """Send the power on command."""
 
         self.jvc_client.power_on()
         self._state = True
 
-    def turn_off(self):
+    def turn_off(self, **kwargs):
         """Send the power off command."""
 
         self.jvc_client.power_off()
@@ -209,7 +209,7 @@ class JVCRemote(RemoteEntity):
                 self._eshift = self.jvc_client.get_eshift_mode()
                 self._hdr_data = self.jvc_client.get_hdr_data()
 
-    def send_command(self, command: Iterable[str]):
+    def send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
 
         self.jvc_client.exec_command(command)
