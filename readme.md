@@ -184,6 +184,36 @@ I used this to re-create the JVC remote in HA. Add the YAML to your dashboard to
 
 Add this sensor to your configuration.yml. Replace the nz7 with the name of your entity. Restart HA.
 
+### Automating HDR modes per Harmony activity
+```yaml
+alias: JVC - HDR PM Automation
+description: ""
+trigger:
+  - platform: state
+    entity_id:
+      - remote.nz7
+    attribute: content_type
+condition:
+  - condition: not
+    conditions:
+      - condition: state
+        entity_id: remote.nz7
+        attribute: content_type
+        state: sdr
+action:
+  - if:
+      - condition: state
+        entity_id: select.harmony_hub_2_activities
+        state: Game
+    then:
+      - service: remote.send_command
+        data:
+          command: picture_mode,hdr10
+mode: single
+
+```
+
+### Remote in UI
 ```yaml
 sensor:
 - platform: template
