@@ -158,11 +158,15 @@ class JVCRemote(RemoteEntity):
             self._input_level = self.jvc_client.get_input_level()
             self._picture_mode = self.jvc_client.get_picture_mode()
 
-            # Only look at laser for NZ
+            # NZ specifics
             if "NZ" in self._model_family:
                 self._content_type = self.jvc_client.get_content_type()
-                self._hdr_processing = self.jvc_client.get_hdr_processing()
-                self._theater_optimizer = self.jvc_client.get_theater_optimizer_state()
+                # only check HDR if the content type matches else timeout
+                if ["hdr", "hlg"] in self._content_type:
+                    self._hdr_processing = self.jvc_client.get_hdr_processing()
+                    self._theater_optimizer = (
+                        self.jvc_client.get_theater_optimizer_state()
+                    )
                 self._laser_mode = self.jvc_client.get_laser_mode()
                 # Some non-nz models support this but some don't, so easier to just not check
                 self._eshift = self.jvc_client.get_eshift_mode()
