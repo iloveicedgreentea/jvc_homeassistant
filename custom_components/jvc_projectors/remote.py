@@ -6,7 +6,13 @@ from jvc_projector.jvc_projector import JVCProjector
 import voluptuous as vol
 
 from homeassistant.components.remote import PLATFORM_SCHEMA, RemoteEntity
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_TIMEOUT, CONF_SCAN_INTERVAL
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_NAME,
+    CONF_PASSWORD,
+    CONF_TIMEOUT,
+    CONF_SCAN_INTERVAL,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -67,7 +73,7 @@ class JVCRemote(RemoteEntity):
         """JVC Init."""
         self._name = name
         self._host = host
-        # use 5 second timeout, try to prevent error loops
+        # attributes
         self._state = False
         self._lowlatency_enabled = False
         self._installation_mode = ""
@@ -79,10 +85,10 @@ class JVCRemote(RemoteEntity):
         self._input_level = ""
         self._content_type = ""
         self._hdr_processing = ""
+        self._lamp_power = ""
+        self._hdr_data = ""
         self._theater_optimizer = ""
-        # Because we can only have one connection at a time, we need to lock every command
-        # otherwise JVC's server implementation will cancel the running command
-        # and just confuse everything, then cause HA to freak out
+
         self.jvc_client = jvc_client
         self._model_family = self.jvc_client.model_family
 
@@ -104,29 +110,52 @@ class JVCRemote(RemoteEntity):
     @property
     def extra_state_attributes(self):
         """Return extra state attributes."""
-        # Useful for making sensors
+        # Separate views for models to be cleaner
+
+        # make sensors or automations based on these
+        if "NZ" in self._model_family:
+            return {
+                "power_state": self._state,
+                "picture_mode": self._picture_mode,
+                "content_type": self._content_type,
+                "hdr_data": self._hdr_data,
+                "hdr_processing": self._hdr_processing,
+                "theater_optimizer": "on" in self._theater_optimizer,
+                "low_latency": self._lowlatency_enabled,
+                "input_mode": self._input_mode,
+                "laser_mode": self._laser_mode,
+                "input_level": self._input_level,
+                "color_mode": self._color_mode,
+                "installation_mode": self._installation_mode,
+                "eshift": self._eshift,
+                "model": self._model_family,
+            }
+
+        if "NX" in self._model_family:
+            return {
+                "power_state": self._state,
+                "picture_mode": self._picture_mode,
+                "hdr_data": self._hdr_data,
+                "low_latency": self._lowlatency_enabled,
+                "input_mode": self._input_mode,
+                "lamp_power": self._lamp_power,
+                "input_level": self._input_level,
+                "installation_mode": self._installation_mode,
+                "color_mode": self._color_mode,
+                "eshift": self._eshift,
+                "model": self._model_family,
+            }
+
+        # for stuff like np-5 
         return {
             "power_state": self._state,
             "picture_mode": self._picture_mode,
-            "installation_mode": self._installation_mode,
-            "content_type": "Unsupported"
-            if "NX" in self._model_family
-            else self._content_type,
-            "hdr_processing": "Unsupported"
-            if "NX" in self._model_family
-            else self._hdr_processing,
-            "theater_optimizer": "Unsupported"
-            if "NX" in self._model_family
-            else "on" in self._theater_optimizer,
             "low_latency": self._lowlatency_enabled,
             "input_mode": self._input_mode,
-            "laser_mode": self._laser_mode
-            if "NZ" in self._model_family
-            else "Unsupported",
             "input_level": self._input_level,
             "color_mode": self._color_mode,
-            "eshift": self._eshift if "NZ" in self._model_family else "Unsupported",
-            "model_family": self._model_family,
+            "installation_mode": self._installation_mode,
+            "model": self._model_family,
         }
 
     @property
@@ -135,13 +164,13 @@ class JVCRemote(RemoteEntity):
 
         return self._state
 
-    def turn_on(self, **kwargs):
+    def turn_on(self):
         """Send the power on command."""
 
         self.jvc_client.power_on()
         self._state = True
 
-    def turn_off(self, **kwargs):
+    def turn_off(self):
         """Send the power off command."""
 
         self.jvc_client.power_off()
@@ -152,6 +181,7 @@ class JVCRemote(RemoteEntity):
         self._state = self.jvc_client.is_on()
 
         if self._state:
+            # Common attributes
             self._lowlatency_enabled = self.jvc_client.is_ll_on()
             self._installation_mode = self.jvc_client.get_install_mode()
             self._input_mode = self.jvc_client.get_input_mode()
@@ -162,17 +192,24 @@ class JVCRemote(RemoteEntity):
             # NZ specifics
             if "NZ" in self._model_family:
                 self._content_type = self.jvc_client.get_content_type()
+                self._laser_mode = self.jvc_client.get_laser_mode()
                 # only check HDR if the content type matches else timeout
                 if any(x in self._content_type for x in ["hdr", "hlg"]):
                     self._hdr_processing = self.jvc_client.get_hdr_processing()
                     self._theater_optimizer = (
                         self.jvc_client.get_theater_optimizer_state()
                     )
-                self._laser_mode = self.jvc_client.get_laser_mode()
-                # Some non-nz models support this but some don't, so easier to just not check
-                self._eshift = self.jvc_client.get_eshift_mode()
+            
+            # Get lamp power if not NZ
+            if not "NZ" in self._model_family:
+                self._lamp_power = self.jvc_client.get_lamp_power()
 
-    def send_command(self, command: Iterable[str], **kwargs):
+            # nx and nz have these things, others may not
+            if any(x in self._model_family for x in ["NX", "NZ"]):
+                self._eshift = self.jvc_client.get_eshift_mode()
+                self._hdr_data = self.jvc_client.get_hdr_data()
+
+    def send_command(self, command: Iterable[str]):
         """Send commands to a device."""
 
         self.jvc_client.exec_command(command)
