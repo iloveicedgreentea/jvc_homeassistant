@@ -146,7 +146,7 @@ class JVCRemote(RemoteEntity):
                 "model": self._model_family,
             }
 
-        # for stuff like np-5 
+        # for stuff like np-5
         return {
             "power_state": self._state,
             "picture_mode": self._picture_mode,
@@ -200,7 +200,7 @@ class JVCRemote(RemoteEntity):
                     self._theater_optimizer = (
                         self.jvc_client.get_theater_optimizer_state()
                     )
-            
+
             # Get lamp power if not NZ
             if not "NZ" in self._model_family:
                 self._lamp_power = self.jvc_client.get_lamp_power()
