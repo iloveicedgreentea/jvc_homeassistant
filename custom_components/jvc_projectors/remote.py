@@ -162,7 +162,7 @@ class JVCRemote(RemoteEntity):
             if "NZ" in self._model_family:
                 self._content_type = self.jvc_client.get_content_type()
                 # only check HDR if the content type matches else timeout
-                if ["hdr", "hlg"] in self._content_type:
+                if any(x in self._content_type for x in ["hdr", "hlg"]):
                     self._hdr_processing = self.jvc_client.get_hdr_processing()
                     self._theater_optimizer = (
                         self.jvc_client.get_theater_optimizer_state()
