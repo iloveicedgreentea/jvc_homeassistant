@@ -1,7 +1,7 @@
 """Implement JVC component."""
 from collections.abc import Iterable
 import logging
-
+import time
 from jvc_projector.jvc_projector import JVCProjector
 import voluptuous as vol
 
@@ -73,7 +73,12 @@ class JVCRemote(RemoteEntity):
         """JVC Init."""
         self._name = name
         self._host = host
+        # used when its ready to accept commands
+        self._is_ready = False
+        self._is_updating = False
+        self._command_running = False
         # attributes
+       
         self._state = False
         self._lowlatency_enabled = False
         self._installation_mode = ""
@@ -179,38 +184,57 @@ class JVCRemote(RemoteEntity):
 
     def update(self):
         """Retrieve latest state."""
-        self._state = self.jvc_client.is_on()
+        # Im not doing it in the lib because HA tends to do whatever it wants wrt locking
+        # don't update if a command is running, will clash
+        if self._command_running is False:
+            self._is_updating = True
+            self._state = self.jvc_client.is_on()
 
-        if self._state:
-            # Common attributes
-            self._lowlatency_enabled = self.jvc_client.is_ll_on()
-            self._installation_mode = self.jvc_client.get_install_mode()
-            self._input_mode = self.jvc_client.get_input_mode()
-            self._color_mode = self.jvc_client.get_color_mode()
-            self._input_level = self.jvc_client.get_input_level()
-            self._picture_mode = self.jvc_client.get_picture_mode()
+            if self._state:
+                # if its connected, on, and we are updating, its safe to mark it as ready
+                self._is_ready = True
+                # Common attributes
+                self._lowlatency_enabled = self.jvc_client.is_ll_on()
+                self._installation_mode = self.jvc_client.get_install_mode()
+                self._input_mode = self.jvc_client.get_input_mode()
+                self._color_mode = self.jvc_client.get_color_mode()
+                self._input_level = self.jvc_client.get_input_level()
+                self._picture_mode = self.jvc_client.get_picture_mode()
 
-            # NZ specifics
-            if "NZ" in self._model_family:
-                self._content_type = self.jvc_client.get_content_type()
-                self._laser_mode = self.jvc_client.get_laser_mode()
-                # only check HDR if the content type matches else timeout
-                if any(x in self._content_type for x in ["hdr", "hlg"]):
-                    self._hdr_processing = self.jvc_client.get_hdr_processing()
-                    self._theater_optimizer = (
-                        self.jvc_client.get_theater_optimizer_state()
-                    )
+                # NZ specifics
+                if "NZ" in self._model_family:
+                    self._content_type = self.jvc_client.get_content_type()
+                    self._laser_mode = self.jvc_client.get_laser_mode()
+                    # only check HDR if the content type matches else timeout
+                    if any(x in self._content_type for x in ["hdr", "hlg"]):
+                        self._hdr_processing = self.jvc_client.get_hdr_processing()
+                        self._theater_optimizer = (
+                            self.jvc_client.get_theater_optimizer_state()
+                        )
 
-            # Get lamp power if not NZ
-            if not "NZ" in self._model_family:
-                self._lamp_power = self.jvc_client.get_lamp_power()
+                # Get lamp power if not NZ
+                if not "NZ" in self._model_family:
+                    self._lamp_power = self.jvc_client.get_lamp_power()
 
-            # nx and nz have these things, others may not
-            if any(x in self._model_family for x in ["NX", "NZ"]):
-                self._eshift = self.jvc_client.get_eshift_mode()
-                self._hdr_data = self.jvc_client.get_hdr_data()
+                # nx and nz have these things, others may not
+                if any(x in self._model_family for x in ["NX", "NZ"]):
+                    self._eshift = self.jvc_client.get_eshift_mode()
+                    self._hdr_data = self.jvc_client.get_hdr_data()
 
+            self._is_updating = False
     def send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
+        retry = 0
 
-        self.jvc_client.exec_command(command)
+        while retry < 10:
+            # don't send command until update is done
+            if self._is_updating is True:
+                time.sleep(1)
+                retry += 1
+                continue
+            
+            # set cmd running flag, run cmd, then break
+            self._command_running = True
+            self.jvc_client.exec_command(command)
+            self._command_running = False
+            break
