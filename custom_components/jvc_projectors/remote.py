@@ -208,6 +208,7 @@ class JVCRemote(RemoteEntity):
                     # only check HDR if the content type matches else timeout
                     if any(x in self._content_type for x in ["hdr", "hlg"]):
                         self._hdr_processing = self.jvc_client.get_hdr_processing()
+                        self._hdr_data = self.jvc_client.get_hdr_data()
                         self._theater_optimizer = (
                             self.jvc_client.get_theater_optimizer_state()
                         )
@@ -219,7 +220,15 @@ class JVCRemote(RemoteEntity):
                 # nx and nz have these things, others may not
                 if any(x in self._model_family for x in ["NX", "NZ"]):
                     self._eshift = self.jvc_client.get_eshift_mode()
-                    self._hdr_data = self.jvc_client.get_hdr_data()
+
+                 # NX and NZ process things diff
+                if "NX" in self._model_family:
+                    self._eshift = self.jvc_client.get_eshift_mode()
+                    # TODO: find better way
+                    try:
+                        self._hdr_data = self.jvc_client.get_hdr_data()
+                    except TypeError:
+                        pass
 
             self._is_updating = False
     def send_command(self, command: Iterable[str], **kwargs):
