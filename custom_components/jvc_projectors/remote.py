@@ -203,6 +203,7 @@ class JVCRemote(RemoteEntity):
 
                 # NZ specifics
                 if "NZ" in self._model_family:
+                    # Only NZ has the content type command
                     self._content_type = self.jvc_client.get_content_type()
                     self._laser_mode = self.jvc_client.get_laser_mode()
                     # only check HDR if the content type matches else timeout
@@ -217,14 +218,12 @@ class JVCRemote(RemoteEntity):
                 if not "NZ" in self._model_family:
                     self._lamp_power = self.jvc_client.get_lamp_power()
 
-                # nx and nz have these things, others may not
+                # Eshift for NX and NZ only
                 if any(x in self._model_family for x in ["NX", "NZ"]):
                     self._eshift = self.jvc_client.get_eshift_mode()
 
                  # NX and NZ process things diff
                 if "NX" in self._model_family:
-                    self._eshift = self.jvc_client.get_eshift_mode()
-                    # TODO: find better way
                     try:
                         self._hdr_data = self.jvc_client.get_hdr_data()
                     except TypeError:
