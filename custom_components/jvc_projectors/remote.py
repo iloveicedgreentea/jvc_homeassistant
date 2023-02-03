@@ -93,6 +93,7 @@ class JVCRemote(RemoteEntity):
         self._lamp_power = ""
         self._hdr_data = ""
         self._theater_optimizer = ""
+        self._laser_power = ""
 
         self.jvc_client = jvc_client
         self._model_family = self.jvc_client.model_family
@@ -122,6 +123,7 @@ class JVCRemote(RemoteEntity):
             return {
                 "power_state": self._state,
                 "picture_mode": self._picture_mode,
+                "laser_power": self._laser_power,
                 "content_type": self._content_type,
                 "hdr_data": self._hdr_data,
                 "hdr_processing": self._hdr_processing,
@@ -206,6 +208,7 @@ class JVCRemote(RemoteEntity):
                     # Only NZ has the content type command
                     self._content_type = self.jvc_client.get_content_type()
                     self._laser_mode = self.jvc_client.get_laser_mode()
+                    self._laser_power = self.jvc_client.get_laser_power()
                     # only check HDR if the content type matches else timeout
                     if any(x in self._content_type for x in ["hdr", "hlg"]):
                         self._hdr_processing = self.jvc_client.get_hdr_processing()
