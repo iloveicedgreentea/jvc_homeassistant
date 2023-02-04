@@ -213,9 +213,10 @@ class JVCRemote(RemoteEntity):
                     if any(x in self._content_type for x in ["hdr", "hlg"]):
                         self._hdr_processing = self.jvc_client.get_hdr_processing()
                         self._hdr_data = self.jvc_client.get_hdr_data()
-                        self._theater_optimizer = (
-                            self.jvc_client.get_theater_optimizer_state()
-                        )
+                        try:
+                            self._theater_optimizer = self.jvc_client.get_theater_optimizer_state()
+                        except TimeoutError:
+                            self._theater_optimizer = "not set"
 
                 # Get lamp power if not NZ
                 if not "NZ" in self._model_family:
