@@ -94,6 +94,10 @@ aperture:
         off
         auto1
         auto2
+aspect_ratio:
+        zoom
+        auto
+        native
 enhance:
         zero
         one

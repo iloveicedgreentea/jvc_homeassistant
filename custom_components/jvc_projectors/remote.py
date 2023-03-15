@@ -78,7 +78,7 @@ class JVCRemote(RemoteEntity):
         self._is_updating = False
         self._command_running = False
         # attributes
-       
+
         self._state = False
         self._lowlatency_enabled = False
         self._installation_mode = ""
@@ -94,6 +94,7 @@ class JVCRemote(RemoteEntity):
         self._hdr_data = ""
         self._theater_optimizer = ""
         self._laser_power = ""
+        self._aspect_ratio = ""
 
         self.jvc_client = jvc_client
         self._model_family = self.jvc_client.model_family
@@ -134,6 +135,7 @@ class JVCRemote(RemoteEntity):
                 "input_level": self._input_level,
                 "color_mode": self._color_mode,
                 "installation_mode": self._installation_mode,
+                "aspect_ratio": self._aspect_ratio,
                 "eshift": self._eshift,
                 "model": self._model_family,
             }
@@ -148,6 +150,7 @@ class JVCRemote(RemoteEntity):
                 "lamp_power": self._lamp_power,
                 "input_level": self._input_level,
                 "installation_mode": self._installation_mode,
+                "aspect_ratio": self._aspect_ratio,
                 "color_mode": self._color_mode,
                 "eshift": self._eshift,
                 "model": self._model_family,
@@ -163,6 +166,7 @@ class JVCRemote(RemoteEntity):
             "input_level": self._input_level,
             "color_mode": self._color_mode,
             "installation_mode": self._installation_mode,
+            "aspect_ratio": self._aspect_ratio,
             "model": self._model_family,
         }
 
@@ -198,6 +202,7 @@ class JVCRemote(RemoteEntity):
                 # Common attributes
                 self._lowlatency_enabled = self.jvc_client.is_ll_on()
                 self._installation_mode = self.jvc_client.get_install_mode()
+                self._aspect_ratio = self.jvc_client.get_aspect_ratio()
                 self._input_mode = self.jvc_client.get_input_mode()
                 self._color_mode = self.jvc_client.get_color_mode()
                 self._input_level = self.jvc_client.get_input_level()
@@ -214,7 +219,9 @@ class JVCRemote(RemoteEntity):
                         self._hdr_processing = self.jvc_client.get_hdr_processing()
                         self._hdr_data = self.jvc_client.get_hdr_data()
                         try:
-                            self._theater_optimizer = self.jvc_client.get_theater_optimizer_state()
+                            self._theater_optimizer = (
+                                self.jvc_client.get_theater_optimizer_state()
+                            )
                         except TimeoutError:
                             self._theater_optimizer = "not set"
 
@@ -226,7 +233,7 @@ class JVCRemote(RemoteEntity):
                 if any(x in self._model_family for x in ["NX", "NZ"]):
                     self._eshift = self.jvc_client.get_eshift_mode()
 
-                 # NX and NZ process things diff
+                # NX and NZ process things diff
                 if "NX" in self._model_family:
                     try:
                         self._hdr_data = self.jvc_client.get_hdr_data()
@@ -234,6 +241,7 @@ class JVCRemote(RemoteEntity):
                         pass
 
             self._is_updating = False
+
     def send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
         retry = 0
@@ -244,7 +252,7 @@ class JVCRemote(RemoteEntity):
                 time.sleep(1)
                 retry += 1
                 continue
-            
+
             # set cmd running flag, run cmd, then break
             self._command_running = True
             self.jvc_client.exec_command(command)
