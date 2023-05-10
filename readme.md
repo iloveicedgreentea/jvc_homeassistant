@@ -15,6 +15,8 @@ All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_pr
 
 It will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. It uses a single persistent connection so any delay you see is because of their menu processing. In my experience it is noticably faster than IR control, ex. I can run about 10 commands per second.
 
+NOTE: JVC projectors currently only support a single network connection at a time. If you're running other control systems or attempt to run the JVC AutoCal software, keep in mind you can only have one control system connected at a time.
+
 ## Installation
 
 This is currently only a custom component. Unlikely to make it into HA core because their process is just too burdensome and I strongly disagree with their deployment model for integrations.
