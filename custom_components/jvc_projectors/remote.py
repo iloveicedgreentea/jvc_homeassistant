@@ -95,6 +95,7 @@ class JVCRemote(RemoteEntity):
         self._theater_optimizer = ""
         self._laser_power = ""
         self._aspect_ratio = ""
+        self._source_status = ""
 
         self.jvc_client = jvc_client
         self._model_family = self.jvc_client.model_family
@@ -207,6 +208,7 @@ class JVCRemote(RemoteEntity):
                 self._color_mode = self.jvc_client.get_color_mode()
                 self._input_level = self.jvc_client.get_input_level()
                 self._picture_mode = self.jvc_client.get_picture_mode()
+                self._source_status = self.jvc_client.get_source_status()
 
                 # NZ specifics
                 if "NZ" in self._model_family:
@@ -234,7 +236,7 @@ class JVCRemote(RemoteEntity):
                     self._eshift = self.jvc_client.get_eshift_mode()
 
                 # NX and NZ process things diff
-                if "NX" in self._model_family:
+                if "NX" in self._model_family and self._source_status == "signal":
                     try:
                         self._hdr_data = self.jvc_client.get_hdr_data()
                     except TypeError:
