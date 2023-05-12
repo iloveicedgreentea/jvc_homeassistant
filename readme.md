@@ -1,4 +1,4 @@
-# JVC Projector Remote Improved Home Assistant
+# JVC Projectors Home Assistant Integration
 
 This is the Home Assistant JVC Component implementing my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_improved)
 
@@ -38,6 +38,8 @@ remote:
     timeout: { seconds } (optional defaults to 3)
     scan_interval: 15 # recommend 15-30. Attributes will poll in this interval
 ```
+
+If you set your scan interval too small you will get update errors because JVC projectors only accept a single command at a time so async is not possible. 
 
 You can use the attributes in sensors, automations, etc.
 

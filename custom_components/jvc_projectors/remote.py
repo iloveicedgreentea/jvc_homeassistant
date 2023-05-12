@@ -95,6 +95,7 @@ class JVCRemote(RemoteEntity):
         self._theater_optimizer = ""
         self._laser_power = ""
         self._aspect_ratio = ""
+        self._mask_mode = ""
 
         self.jvc_client = jvc_client
         self._model_family = self.jvc_client.model_family
@@ -138,6 +139,7 @@ class JVCRemote(RemoteEntity):
                 "aspect_ratio": self._aspect_ratio,
                 "eshift": self._eshift,
                 "model": self._model_family,
+                "mask_mode": self._mask_mode
             }
 
         if "NX" in self._model_family:
@@ -154,6 +156,7 @@ class JVCRemote(RemoteEntity):
                 "color_mode": self._color_mode,
                 "eshift": self._eshift,
                 "model": self._model_family,
+                "mask_mode": self._mask_mode
             }
 
         # for stuff like np-5
@@ -168,6 +171,7 @@ class JVCRemote(RemoteEntity):
             "installation_mode": self._installation_mode,
             "aspect_ratio": self._aspect_ratio,
             "model": self._model_family,
+            "mask_mode": self._mask_mode
         }
 
     @property
@@ -207,6 +211,7 @@ class JVCRemote(RemoteEntity):
                 self._color_mode = self.jvc_client.get_color_mode()
                 self._input_level = self.jvc_client.get_input_level()
                 self._picture_mode = self.jvc_client.get_picture_mode()
+                self._mask_mode = self.jvc_client.get_mask_mode()
 
                 # NZ specifics
                 if "NZ" in self._model_family:
