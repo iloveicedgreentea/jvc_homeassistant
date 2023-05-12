@@ -90,6 +90,7 @@ class JVCRemote(RemoteEntity):
         self._input_level = ""
         self._content_type = ""
         self._hdr_processing = ""
+        self._hdr_level = ""
         self._lamp_power = ""
         self._hdr_data = ""
         self._theater_optimizer = ""
@@ -224,6 +225,7 @@ class JVCRemote(RemoteEntity):
                     # only check HDR if the content type matches else timeout
                     if any(x in self._content_type for x in ["hdr", "hlg"]):
                         self._hdr_processing = self.jvc_client.get_hdr_processing()
+                        self._hdr_level = self.jvc_client.get_hdr_level()
                         self._hdr_data = self.jvc_client.get_hdr_data()
                         try:
                             self._theater_optimizer = (
@@ -244,6 +246,7 @@ class JVCRemote(RemoteEntity):
                 if "NX" in self._model_family and self._source_status == "signal":
                     try:
                         self._hdr_data = self.jvc_client.get_hdr_data()
+                        self._hdr_level = self.jvc_client.get_hdr_level()
                     except TypeError:
                         pass
 
