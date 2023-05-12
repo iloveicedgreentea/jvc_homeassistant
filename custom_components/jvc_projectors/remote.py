@@ -73,34 +73,35 @@ class JVCRemote(RemoteEntity):
         """JVC Init."""
         self._name = name
         self._host = host
+
         # used when its ready to accept commands
         self._is_ready = False
         self._is_updating = False
         self._command_running = False
+        
         # attributes
-
         self._state = False
-        self._lowlatency_enabled = False
-        self._installation_mode = ""
-        self._picture_mode = ""
-        self._input_mode = ""
-        self._laser_mode = ""
-        self._eshift = ""
-        self._color_mode = ""
-        self._input_level = ""
-        self._content_type = ""
-        self._hdr_processing = ""
-        self._hdr_level = ""
-        self._lamp_power = ""
-        self._hdr_data = ""
-        self._theater_optimizer = ""
-        self._laser_power = ""
-        self._aspect_ratio = ""
-        self._mask_mode = ""
-        self._source_status = ""
+        self._lowlatency_enabled = "unknown"
+        self._installation_mode = "unknown"
+        self._picture_mode = "unknown"
+        self._input_mode = "unknown"
+        self._laser_mode = "unknown"
+        self._eshift = "unknown"
+        self._color_mode = "unknown"
+        self._input_level = "unknown"
+        self._content_type = "unknown"
+        self._hdr_processing = "unknown"
+        self._hdr_level = "unknown"
+        self._lamp_power = "unknown"
+        self._hdr_data = "unknown"
+        self._theater_optimizer = "unknown"
+        self._laser_power = "unknown"
+        self._aspect_ratio = "unknown"
+        self._mask_mode = "unknown"
+        self._source_status = "unknown"
+        self._model_family = self.jvc_client.model_family
 
         self.jvc_client = jvc_client
-        self._model_family = self.jvc_client.model_family
 
     @property
     def should_poll(self):
@@ -131,7 +132,7 @@ class JVCRemote(RemoteEntity):
                 "content_type": self._content_type,
                 "hdr_data": self._hdr_data,
                 "hdr_processing": self._hdr_processing,
-                "theater_optimizer": "on" in self._theater_optimizer,
+                "theater_optimizer": self._theater_optimizer,
                 "low_latency": self._lowlatency_enabled,
                 "input_mode": self._input_mode,
                 "laser_mode": self._laser_mode,
