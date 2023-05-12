@@ -229,8 +229,8 @@ class JVCRemote(RemoteEntity):
                 if not "NZ" in self._model_family:
                     self._lamp_power = self.jvc_client.get_lamp_power()
 
-                # Eshift for NX and NZ only
-                if any(x in self._model_family for x in ["NX", "NZ"]):
+                # Eshift for NX9 and NZ only
+                if any(x in self._model_family for x in ["NX9", "NZ"]):
                     self._eshift = self.jvc_client.get_eshift_mode()
 
                 # NX and NZ process things diff
