@@ -78,6 +78,8 @@ class JVCRemote(RemoteEntity):
         self._is_ready = False
         self._is_updating = False
         self._command_running = False
+
+        self.jvc_client = jvc_client
         
         # attributes
         self._state = False
@@ -99,9 +101,8 @@ class JVCRemote(RemoteEntity):
         self._aspect_ratio = "unknown"
         self._mask_mode = "unknown"
         self._source_status = "unknown"
-        self._model_family = self.jvc_client.model_family
 
-        self.jvc_client = jvc_client
+        self._model_family = self.jvc_client.model_family
 
     @property
     def should_poll(self):
@@ -218,22 +219,23 @@ class JVCRemote(RemoteEntity):
                 self._source_status = self.jvc_client.get_source_status()
 
                 # NZ specifics
-                if "NZ" in self._model_family:
+                if "NZ" in self._model_family and self._source_status == "signal":
                     # Only NZ has the content type command
                     self._content_type = self.jvc_client.get_content_type()
                     self._laser_mode = self.jvc_client.get_laser_mode()
                     self._laser_power = self.jvc_client.get_laser_power()
                     # only check HDR if the content type matches else timeout
                     if any(x in self._content_type for x in ["hdr", "hlg"]):
-                        self._hdr_processing = self.jvc_client.get_hdr_processing()
-                        self._hdr_level = self.jvc_client.get_hdr_level()
-                        self._hdr_data = self.jvc_client.get_hdr_data()
+                        
                         try:
                             self._theater_optimizer = (
                                 self.jvc_client.get_theater_optimizer_state()
                             )
+                            self._hdr_processing = self.jvc_client.get_hdr_processing()
+                            self._hdr_level = self.jvc_client.get_hdr_level()
+                            self._hdr_data = self.jvc_client.get_hdr_data()
                         except TimeoutError:
-                            self._theater_optimizer = "not set"
+                            _LOGGER.error("Timeout getting HDR data")
 
                 # Get lamp power if not NZ
                 if not "NZ" in self._model_family:
