@@ -14,13 +14,9 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv, entity_platform
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-
-from .const import (
-    INFO_COMMAND,
-)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,12 +71,11 @@ class JVCRemote(RemoteEntity):
         self._host = host
 
         # used when its ready to accept commands
-        self._is_ready = False
         self._is_updating = False
         self._command_running = False
 
         self.jvc_client = jvc_client
-        
+
         # attributes
         self._state = False
         self._lowlatency_enabled = "unknown"
@@ -92,6 +87,7 @@ class JVCRemote(RemoteEntity):
         self._color_mode = "unknown"
         self._input_level = "unknown"
         self._content_type = "unknown"
+        self._content_type_trans = "unknown"
         self._hdr_processing = "unknown"
         self._hdr_level = "unknown"
         self._lamp_power = "unknown"
@@ -124,60 +120,26 @@ class JVCRemote(RemoteEntity):
         """Return extra state attributes."""
         # Separate views for models to be cleaner
 
-        # make sensors or automations based on these
-        if "NZ" in self._model_family:
-            return {
-                "power_state": self._state,
-                "picture_mode": self._picture_mode,
-                "laser_power": self._laser_power,
-                "content_type": self._content_type,
-                "hdr_data": self._hdr_data,
-                "hdr_processing": self._hdr_processing,
-                "hdr_level": self._hdr_level,
-                "theater_optimizer": self._theater_optimizer,
-                "low_latency": self._lowlatency_enabled,
-                "input_mode": self._input_mode,
-                "laser_mode": self._laser_mode,
-                "input_level": self._input_level,
-                "color_mode": self._color_mode,
-                "installation_mode": self._installation_mode,
-                "aspect_ratio": self._aspect_ratio,
-                "eshift": self._eshift,
-                "model": self._model_family,
-                "mask_mode": self._mask_mode
-            }
-
-        if "NX" in self._model_family:
-            return {
-                "power_state": self._state,
-                "picture_mode": self._picture_mode,
-                "hdr_data": self._hdr_data,
-                "hdr_level": self._hdr_level,
-                "low_latency": self._lowlatency_enabled,
-                "input_mode": self._input_mode,
-                "lamp_power": self._lamp_power,
-                "input_level": self._input_level,
-                "installation_mode": self._installation_mode,
-                "aspect_ratio": self._aspect_ratio,
-                "color_mode": self._color_mode,
-                "eshift": self._eshift,
-                "model": self._model_family,
-                "mask_mode": self._mask_mode
-            }
-
-        # for stuff like np-5
         return {
             "power_state": self._state,
             "picture_mode": self._picture_mode,
+            "laser_power": self._laser_power,
+            "content_type": self._content_type,
+            "content_type_trans": self._content_type_trans,
+            "hdr_data": self._hdr_data,
+            "hdr_processing": self._hdr_processing,
+            "hdr_level": self._hdr_level,
+            "theater_optimizer": self._theater_optimizer,
             "low_latency": self._lowlatency_enabled,
             "input_mode": self._input_mode,
-            "lamp_power": self._lamp_power,
+            "laser_mode": self._laser_mode,
             "input_level": self._input_level,
             "color_mode": self._color_mode,
             "installation_mode": self._installation_mode,
             "aspect_ratio": self._aspect_ratio,
+            "eshift": self._eshift,
             "model": self._model_family,
-            "mask_mode": self._mask_mode
+            "mask_mode": self._mask_mode,
         }
 
     @property
@@ -207,8 +169,6 @@ class JVCRemote(RemoteEntity):
             self._state = self.jvc_client.is_on()
 
             if self._state:
-                # if its connected, on, and we are updating, its safe to mark it as ready
-                self._is_ready = True
                 # Common attributes
                 self._lowlatency_enabled = self.jvc_client.is_ll_on()
                 self._installation_mode = self.jvc_client.get_install_mode()
@@ -220,40 +180,40 @@ class JVCRemote(RemoteEntity):
                 self._mask_mode = self.jvc_client.get_mask_mode()
                 self._source_status = self.jvc_client.get_source_status()
 
-                # NZ specifics
-                if "NZ" in self._model_family and self._source_status == "signal":
-                    # Only NZ has the content type command
-                    self._content_type = self.jvc_client.get_content_type()
-                    self._laser_mode = self.jvc_client.get_laser_mode()
-                    self._laser_power = self.jvc_client.get_laser_power()
-                    # only check HDR if the content type matches else timeout
-                    if any(x in self._content_type for x in ["hdr", "hlg"]):
-                        
-                        try:
-                            self._theater_optimizer = (
-                                self.jvc_client.get_theater_optimizer_state()
-                            )
-                            self._hdr_processing = self.jvc_client.get_hdr_processing()
-                            self._hdr_level = self.jvc_client.get_hdr_level()
-                            self._hdr_data = self.jvc_client.get_hdr_data()
-                        except TimeoutError:
-                            _LOGGER.error("Timeout getting HDR data")
-
-                # Get lamp power if not NZ
-                if not "NZ" in self._model_family:
-                    self._lamp_power = self.jvc_client.get_lamp_power()
+                if self._source_status == "signal":
+                    try:
+                        # latest firmware of NX also has content type
+                        self._content_type = self.jvc_client.get_content_type()
+                        self._content_type_trans = (
+                            self.jvc_client.get_content_type_trans()
+                        )
+                    except TimeoutError:
+                        _LOGGER.error("timeout getting content type")
 
                 # Eshift for NX9 and NZ only
                 if any(x in self._model_family for x in ["NX9", "NZ"]):
                     self._eshift = self.jvc_client.get_eshift_mode()
 
-                # NX and NZ process things diff
-                if "NX" in self._model_family and self._source_status == "signal":
+                # laser power
+                if "NZ" in self._model_family:
+                    self._laser_mode = self.jvc_client.get_laser_mode()
+                    self._laser_power = self.jvc_client.get_laser_power()
+                else:
+                    self._lamp_power = self.jvc_client.get_lamp_power()
+
+                # get HDR data
+                if any(x in self._content_type_trans for x in ["hdr", "hlg"]):
                     try:
-                        self._hdr_data = self.jvc_client.get_hdr_data()
+                        if "NZ" in self._model_family:
+                            self._theater_optimizer = (
+                                self.jvc_client.get_theater_optimizer_state()
+                            )
+                        # both nx and nz support these
+                        self._hdr_processing = self.jvc_client.get_hdr_processing()
                         self._hdr_level = self.jvc_client.get_hdr_level()
-                    except TypeError:
-                        pass
+                        self._hdr_data = self.jvc_client.get_hdr_data()
+                    except TimeoutError:
+                        _LOGGER.error("timeout getting HDR data")
 
             self._is_updating = False
 
