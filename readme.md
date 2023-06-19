@@ -70,6 +70,10 @@ example: "anamorphic,off"
 example: "anamorphic,d"
 example: "laser_dim,auto3"
 
+It also supports using remote codes as ASCII [found here](https://support.jvc.com/consumer/support/documents/DILAremoteControlGuide.pdf) (Code A only)
+
+example: "remote,2E"
+
 ```
 Currently Supported Commands:
         anamorphic
@@ -212,6 +216,7 @@ MaskModes
         off
 MenuModes
         menu
+        lens_control
         up
         down
         back
