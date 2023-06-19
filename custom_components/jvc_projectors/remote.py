@@ -210,9 +210,18 @@ class JVCRemote(RemoteEntity):
                             self._theater_optimizer = (
                                 self.jvc_client.get_theater_optimizer_state()
                             )
+                    except TimeoutError:
+                        _LOGGER.error("timeout getting theater optimzer data")
+                    try:
                         # both nx and nz support these
                         self._hdr_processing = self.jvc_client.get_hdr_processing()
+                    except TimeoutError:
+                        _LOGGER.error("timeout getting HDR processing")
+                    try:
                         self._hdr_level = self.jvc_client.get_hdr_level()
+                    except TimeoutError:
+                        _LOGGER.error("timeout getting HDR level")
+                    try:
                         self._hdr_data = self.jvc_client.get_hdr_data()
                     except TimeoutError:
                         _LOGGER.error("timeout getting HDR data")
