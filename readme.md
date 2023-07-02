@@ -104,6 +104,7 @@ Currently Supported Commands:
         picture_mode
         power
         remote
+        signal_3d
         source_status
         theater_optimizer
 
@@ -262,6 +263,11 @@ SourceStatuses
 TheaterOptimizer
         off
         on
+ThreeD
+        auto
+        sbs
+        ou
+        2d
 ```
 
 ## Useful Stuff
