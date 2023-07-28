@@ -173,14 +173,17 @@ class JVCRemote(RemoteEntity):
             if self._state:
                 # Common attributes
                 self._lowlatency_enabled = self.jvc_client.is_ll_on()
-                self._installation_mode = self.jvc_client.get_install_mode()
-                self._aspect_ratio = self.jvc_client.get_aspect_ratio()
-                self._input_mode = self.jvc_client.get_input_mode()
-                self._color_mode = self.jvc_client.get_color_mode()
-                self._input_level = self.jvc_client.get_input_level()
                 self._picture_mode = self.jvc_client.get_picture_mode()
-                self._mask_mode = self.jvc_client.get_mask_mode()
-                self._source_status = self.jvc_client.get_source_status()
+                self._input_mode = self.jvc_client.get_input_mode()
+                
+                # some older models don't support these
+                if not "Unsupported" in self._model_family:
+                    self._installation_mode = self.jvc_client.get_install_mode()
+                    self._aspect_ratio = self.jvc_client.get_aspect_ratio()
+                    self._color_mode = self.jvc_client.get_color_mode()
+                    self._input_level = self.jvc_client.get_input_level()
+                    self._mask_mode = self.jvc_client.get_mask_mode()
+                    self._source_status = self.jvc_client.get_source_status()
 
                 if self._source_status == "signal":
                     try:
