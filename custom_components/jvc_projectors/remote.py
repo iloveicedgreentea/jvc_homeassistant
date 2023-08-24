@@ -119,29 +119,34 @@ class JVCRemote(RemoteEntity):
     def extra_state_attributes(self):
         """Return extra state attributes."""
         # Separate views for models to be cleaner
+        if self._state:
+            return {
+                "power_state": self._state,
+                "signal_status": self._source_status,
+                "picture_mode": self._picture_mode,
+                "installation_mode": self._installation_mode,
+                "laser_power": self._laser_power,
+                "laser_mode": self._laser_mode,
+                "lamp_power": self._lamp_power,
+                "model": self._model_family,
+                "content_type": self._content_type,
+                "content_type_trans": self._content_type_trans,
+                "hdr_data": self._hdr_data,
+                "hdr_processing": self._hdr_processing,
+                "hdr_level": self._hdr_level,
+                "theater_optimizer": self._theater_optimizer,
+                "low_latency": self._lowlatency_enabled,
+                "input_mode": self._input_mode,
+                "input_level": self._input_level,
+                "color_mode": self._color_mode,
+                "aspect_ratio": self._aspect_ratio,
+                "eshift": self._eshift,
+                "mask_mode": self._mask_mode,
+            }
 
         return {
             "power_state": self._state,
-            "signal_status": self._source_status,
-            "picture_mode": self._picture_mode,
-            "installation_mode": self._installation_mode,
-            "laser_power": self._laser_power,
-            "laser_mode": self._laser_mode,
-            "lamp_power": self._lamp_power,
-            "model": self._model_family,
-            "content_type": self._content_type,
-            "content_type_trans": self._content_type_trans,
-            "hdr_data": self._hdr_data,
-            "hdr_processing": self._hdr_processing,
-            "hdr_level": self._hdr_level,
-            "theater_optimizer": self._theater_optimizer,
-            "low_latency": self._lowlatency_enabled,
-            "input_mode": self._input_mode,
-            "input_level": self._input_level,
-            "color_mode": self._color_mode,
-            "aspect_ratio": self._aspect_ratio,
-            "eshift": self._eshift,
-            "mask_mode": self._mask_mode,
+            "signal_status": "",
         }
 
     @property
@@ -175,7 +180,7 @@ class JVCRemote(RemoteEntity):
                 self._lowlatency_enabled = self.jvc_client.is_ll_on()
                 self._picture_mode = self.jvc_client.get_picture_mode()
                 self._input_mode = self.jvc_client.get_input_mode()
-                
+
                 # some older models don't support these
                 if not "Unsupported" in self._model_family:
                     self._installation_mode = self.jvc_client.get_install_mode()
