@@ -70,30 +70,8 @@ class JVCRemote(RemoteEntity):
         self._host = options.host
 
         self.jvc_client = jvc_client
-        # TODO: dataclass
         # attributes
         self._state = False
-        self._lowlatency_enabled = ""
-        self._installation_mode = ""
-        self._picture_mode = ""
-        self._input_mode = ""
-        self._laser_mode = ""
-        self._eshift = ""
-        self._color_mode = ""
-        self._input_level = ""
-        self._content_type = ""
-        self._content_type_trans = ""
-        self._hdr_processing = ""
-        self._hdr_level = ""
-        self._lamp_power = ""
-        self._hdr_data = ""
-        self._theater_optimizer = ""
-        self._laser_power = ""
-        self._aspect_ratio = ""
-        self._mask_mode = ""
-        self._source_status = ""
-
-        self._model_family = self.jvc_client.model_family
 
         # async queue
         self.tasks = []
@@ -309,7 +287,7 @@ class JVCRemote(RemoteEntity):
                 )
             # HDR stuff
             if any(x in self._content_type_trans for x in ["hdr", "hlg"]):
-                if "NZ" in self._model_family:
+                if "NZ" in self.jvc_client.model_family:
                     attribute_getters.append(
                         (self.jvc_client.get_theater_optimizer_state, "theater_optimizer"),
                     )
@@ -330,80 +308,8 @@ class JVCRemote(RemoteEntity):
             self.jvc_client.attributes.model = self.jvc_client.model_family
             # just in case
             self._state = self.jvc_client.attributes.power_state
-            # Common attributes
-            # self._lowlatency_enabled = self.jvc_client.is_ll_on()
-            # self._picture_mode = self.jvc_client.get_picture_mode()
-            # self._input_mode = self.jvc_client.get_input_mode()
-
-            # # some older models don't support these
-            # if not "Unsupported" in self._model_family:
-            #     self._installation_mode = self.jvc_client.get_install_mode()
-            #     self._aspect_ratio = self.jvc_client.get_aspect_ratio()
-            #     self._color_mode = self.jvc_client.get_color_mode()
-            #     self._input_level = self.jvc_client.get_input_level()
-            #     self._mask_mode = self.jvc_client.get_mask_mode()
-            #     self._source_status = self.jvc_client.get_source_status()
-            # # TODO: lamp time
-            # # TODO: get_software_version
-            # if self._source_status == "signal":
-            #     try:
-            #         # latest firmware of NX also has content type
-            #         self._content_type = self.jvc_client.get_content_type()
-            #         self._content_type_trans = (
-            #             self.jvc_client.get_content_type_trans()
-            #         )
-            #     except TimeoutError:
-            #         _LOGGER.error("timeout getting content type")
-
-            # # Eshift for NX9 and NZ only
-            # if any(x in self._model_family for x in ["NX9", "NZ"]):
-            #     self._eshift = self.jvc_client.get_eshift_mode()
-
-            # # laser power
-            # if "NZ" in self._model_family:
-            #     self._laser_mode = self.jvc_client.get_laser_mode()
-            #     self._laser_power = self.jvc_client.get_laser_power()
-            # else:
-            #     self._lamp_power = self.jvc_client.get_lamp_power()
-
-            # # get HDR data
-            # if any(x in self._content_type_trans for x in ["hdr", "hlg"]):
-            #     try:
-            #         if "NZ" in self._model_family:
-            #             self._theater_optimizer = (
-            #                 self.jvc_client.get_theater_optimizer_state()
-            #             )
-            #     except TimeoutError:
-            #         _LOGGER.error("timeout getting theater optimzer data")
-            #     try:
-            #         # both nx and nz support these
-            #         self._hdr_processing = self.jvc_client.get_hdr_processing()
-            #     except TimeoutError:
-            #         _LOGGER.error("timeout getting HDR processing")
-            #     try:
-            #         self._hdr_level = self.jvc_client.get_hdr_level()
-            #     except TimeoutError:
-            #         _LOGGER.error("timeout getting HDR level")
-            #     try:
-            #         self._hdr_data = self.jvc_client.get_hdr_data()
-            #     except TimeoutError:
-            #         _LOGGER.error("timeout getting HDR data")
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
         _LOGGER.debug("adding command %s to queue", command)
         await self.command_queue.put(command)
-        # retry = 0
-        # _LOGGER.debug("adding command %s", command)
-        # while retry < 10:
-        #     # don't send command until update is done
-        #     if self._is_updating is True:
-        #         time.sleep(1)
-        #         retry += 1
-        #         continue
-        #     # TODO: add to queue
-        #     # set cmd running flag, run cmd, then break
-        #     self._command_running = True
-        #     await self.jvc_client.exec_command(command)
-        #     self._command_running = False
-        #     break
