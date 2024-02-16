@@ -1,4 +1,5 @@
 """Implement JVC component."""
+
 from collections.abc import Iterable
 import logging
 import asyncio
@@ -41,7 +42,12 @@ async def async_setup_platform(
     discovery_info: DiscoveryInfoType = None,
 ) -> None:
     """Set up platform."""
-    options = JVCInput(config.get(CONF_HOST), config.get(CONF_PASSWORD), 20554, int(config.get(CONF_TIMEOUT, 3)))
+    options = JVCInput(
+        config.get(CONF_HOST),
+        config.get(CONF_PASSWORD),
+        20554,
+        int(config.get(CONF_TIMEOUT, 3)),
+    )
     name = config.get(CONF_NAME)
     jvc_client = JVCProjectorCoordinator(
         options,
@@ -86,6 +92,7 @@ class JVCRemote(RemoteEntity):
         # add the queue handler to the event loop
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
+        # update background worker
         worker_handler = self.hass.loop.create_task(self.update_worker())
         self.tasks.append(worker_handler)
 
@@ -116,7 +123,10 @@ class JVCRemote(RemoteEntity):
                 await self.process_dlq()
             # if we are stopping and the queue is not empty, clear it
             # this is so it doesnt continuously print the stopped processing commands message
-            if self.stop_processing_commands.is_set() and not self.command_queue.empty():
+            if (
+                self.stop_processing_commands.is_set()
+                and not self.command_queue.empty()
+            ):
                 await self.clear_queue()
                 _LOGGER.debug("Stopped processing commands")
                 # break to the outer loop so it can restart itself if needed
@@ -130,6 +140,14 @@ class JVCRemote(RemoteEntity):
             await self.command_queue.get()
             self.command_queue.task_done()
 
+        while not self.dead_letter_queue.empty():
+            await self.dead_letter_queue.get()
+            self.dead_letter_queue.task_done()
+
+        while not self.attribute_queue.empty():
+            await self.attribute_queue.get()
+            self.attribute_queue.task_done()
+
     async def process_dlq(self):
         """Process the dead letter queue"""
         if not self.dead_letter_queue.empty():
@@ -140,11 +158,12 @@ class JVCRemote(RemoteEntity):
                 await self.jvc_client.exec_command(command)
                 _LOGGER.debug("Command executed successfully from DLQ: %s", command)
                 return  # Exit the retry loop upon success
-            except Exception as err: # pylint: disable=broad-except
+            except Exception as err:  # pylint: disable=broad-except
                 _LOGGER.error("DLQ attempt failed for %s: %s", command, err)
                 return
             finally:
                 self.lock.release()
+                self.dead_letter_queue.task_done()
 
     async def process_command(self, command):
         """async process a command"""
@@ -159,8 +178,10 @@ class JVCRemote(RemoteEntity):
                 _LOGGER.info("Command executed successfully: %s", command)
                 break  # Exit the retry loop upon success
             # intentionally catching all exceptions for dlq
-            except Exception as err: # pylint: disable=broad-except
-                _LOGGER.error("Attempt %s failed for command %s: %s", attempt + 1, command, err)
+            except Exception as err:  # pylint: disable=broad-except
+                _LOGGER.error(
+                    "Attempt %s failed for command %s: %s", attempt + 1, command, err
+                )
                 if attempt <= max_retries - 1:
                     await asyncio.sleep(retry_delay)  # Wait before retrying
                 else:
@@ -171,6 +192,24 @@ class JVCRemote(RemoteEntity):
                 self.lock.release()
 
         self.command_queue.task_done()
+
+    async def update_worker(self):
+        """Gets a function and attribute from a queue and runs it."""
+        while True:
+            if not self.stop_processing_commands.is_set():
+                # getter will be a function like get_source_status()
+                getter, attribute = await self.attribute_queue.get()
+                try:
+                    # get lock
+                    await self.lock.acquire()
+                    value = await getter()
+                    setattr(self.jvc_client.attributes, attribute, value)
+                except Exception as err:  # pylint: disable=broad-except
+                    _LOGGER.error("Error getting attribute: %s", err)
+                finally:
+                    self.attribute_queue.task_done()
+                    self.lock.release()
+            await asyncio.sleep(0.1)
 
     @property
     def should_poll(self):
@@ -194,9 +233,7 @@ class JVCRemote(RemoteEntity):
         if self._state:
             return asdict(self.jvc_client.attributes)
 
-        return {
-            "power_state": self._state
-        }
+        return {"power_state": self._state}
 
     @property
     def is_on(self):
@@ -204,38 +241,19 @@ class JVCRemote(RemoteEntity):
 
         return self._state
 
-    async def async_turn_on(self, **kwargs): # pylint: disable=unused-argument
+    async def async_turn_on(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power on command."""
 
         await self.jvc_client.power_on()
         await self.stop_processing_commands.clear()
         self._state = True
 
-    async def async_turn_off(self, **kwargs): # pylint: disable=unused-argument
+    async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
 
         await self.jvc_client.power_off()
         await self.stop_processing_commands.set()
         self._state = False
-
-    async def update_worker(self):
-        """Gets a function and attribute from a queue and runs it."""
-        while True:
-            if not self.stop_processing_commands.is_set():
-                # getter will be a function like get_source_status()
-                getter, attribute = await self.attribute_queue.get()
-                try:
-                    # get lock
-                    await self.lock.acquire()
-                    value = await getter()
-                    setattr(self.jvc_client.attributes, attribute, value)
-                # TODO: less broad
-                except Exception as err: # pylint: disable=broad-except
-                    _LOGGER.error("Error getting attribute: %s", err)
-                finally:
-                    self.attribute_queue.task_done()
-                    self.lock.release()
-            await asyncio.sleep(0.1)
 
     async def async_update(self):
         """Retrieve latest state."""
@@ -285,13 +303,25 @@ class JVCRemote(RemoteEntity):
                 attribute_getters.append(
                     (self.jvc_client.get_lamp_power, "lamp_power"),
                 )
+
+            for getter, name in attribute_getters:
+                await self.attribute_queue.put((getter, name))
+
+            # get hdr attributes
+            await self.attribute_queue.join()
+
             # HDR stuff
-            if any(x in self._content_type_trans for x in ["hdr", "hlg"]):
+            if any(
+                x in self.jvc_client.attributes.content_type_trans
+                for x in ["hdr", "hlg"]
+            ):
                 if "NZ" in self.jvc_client.model_family:
                     attribute_getters.append(
-                        (self.jvc_client.get_theater_optimizer_state, "theater_optimizer"),
+                        (
+                            self.jvc_client.get_theater_optimizer_state,
+                            "theater_optimizer",
+                        ),
                     )
-                # TODO: each one can time out separately
                 attribute_getters.append(
                     (self.jvc_client.get_hdr_processing, "hdr_processing"),
                     (self.jvc_client.get_hdr_level, "hdr_level"),
@@ -303,7 +333,7 @@ class JVCRemote(RemoteEntity):
                 await self.attribute_queue.put((getter, name))
 
             await self.attribute_queue.join()
-            
+
             # set the model
             self.jvc_client.attributes.model = self.jvc_client.model_family
             # just in case
