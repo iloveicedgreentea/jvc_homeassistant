@@ -17,7 +17,7 @@ It will run each button/command in the order it received. so commands won't disa
 
 Note: JVC projectors currently only support a single network connection at a time. If you're running other control systems or attempt to run the JVC AutoCal software, keep in mind you can only have one control system connected at a time.
 
-Note: Only NX and NZ series are officially supported.
+Note: Only NX and NZ series are officially supported but this should work with any JVC projector that has an ethernet port.
 
 ## Installation
 
