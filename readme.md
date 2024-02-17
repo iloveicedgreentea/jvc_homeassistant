@@ -10,10 +10,8 @@ All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_pr
 - Picture Modes
 - Laser power and dimming
 - Pretty much every JVC command
-- HA Attributes for current settings like power state, picture mode, laser mode, input, etc
-- and so on
-
-It will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. It uses a single persistent connection so any delay you see is because of their menu processing. In my experience it is noticably faster than IR control, ex. I can run about 10 commands per second.
+- Entity Attributes for current settings like power state, picture mode, laser mode, input, etc
+- Async processing
 
 Note: JVC projectors currently only support a single network connection at a time. If you're running other control systems or attempt to run the JVC AutoCal software, keep in mind you can only have one control system connected at a time.
 
@@ -60,6 +58,33 @@ sensor:
                 Off
             {% endif %}
 ```
+
+### Attributes
+
+These are the attributes supported for the entity
+* power_state
+* signal_status
+* picture_mode
+* installation_mode
+* laser_power
+* laser_mode
+* lamp_power
+* model
+* content_type
+* content_type_trans (the transition - sdr or hdr)
+* hdr_data
+* hdr_processing
+* hdr_level
+* theater_optimizer
+* low_latency
+* input_mode
+* input_level
+* color_mode
+* aspect_ratio
+* eshift
+* mask_mode
+* software_version
+* lamp_time
 
 ## Usage
 

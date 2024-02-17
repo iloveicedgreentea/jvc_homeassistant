@@ -1,21 +1,22 @@
 {
   "config": {
+    "title": "JVC Projector",
     "step": {
       "user": {
+        "title": "Connect to your JVC Projector",
         "data": {
-          "host": "[%key:common::config_flow::data::host%]",
-          "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]"
+          "host": "Host",
+          "name": "Name",
+          "password": "Password (NZ+ series only)",
+          "timeout": "Timeout (Optional)"
         }
       }
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "cannot_connect": "Failed to connect to the projector. Please check the host and try again."
     },
-    "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    "success": {
+      "create_entry": "Successfully connected to your JVC Projector."
     }
   }
 }
