@@ -8,7 +8,7 @@ import traceback
 
 from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator
 import voluptuous as vol
-
+from .const import DOMAIN
 from homeassistant.components.remote import PLATFORM_SCHEMA, RemoteEntity
 from homeassistant.const import (
     CONF_HOST,
@@ -21,6 +21,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.config_entries import ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,30 +37,30 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
-async def async_setup_platform(
-    hass: HomeAssistant,
-    config: ConfigType,
-    async_add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType = None,
-) -> None:
-    """Set up platform."""
-    options = JVCInput(
-        config.get(CONF_HOST),
-        config.get(CONF_PASSWORD),
-        20554,
-        int(config.get(CONF_TIMEOUT, 3)),
-    )
-    name = config.get(CONF_NAME)
-    jvc_client = JVCProjectorCoordinator(
-        options,
-        logger=_LOGGER,
-    )
-    # create a long lived connection
-    async_add_entities(
-        [
-            JVCRemote(name, options, jvc_client),
-        ]
-    )
+# async def async_setup_platform(
+#     hass: HomeAssistant,
+#     config: ConfigType,
+#     async_add_entities: AddEntitiesCallback,
+#     discovery_info: DiscoveryInfoType = None,
+# ) -> None:
+#     """Set up platform."""
+#     options = JVCInput(
+#         config.get(CONF_HOST),
+#         config.get(CONF_PASSWORD),
+#         20554,
+#         int(config.get(CONF_TIMEOUT, 3)),
+#     )
+#     name = config.get(CONF_NAME)
+#     jvc_client = JVCProjectorCoordinator(
+#         options,
+#         logger=_LOGGER,
+#     )
+#     # create a long lived connection
+#     async_add_entities(
+#         [
+#             JVCRemote(name, options, jvc_client),
+#         ]
+#     )
 
 
 class JVCRemote(RemoteEntity):
@@ -426,3 +427,18 @@ class JVCRemote(RemoteEntity):
         """Send commands to a device."""
         _LOGGER.debug("adding command %s to queue", command)
         await self.command_queue.put(command)
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+    """Set up JVC Remote based on a config entry."""
+    # Retrieve your setup data or coordinator from hass.data
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+
+    # You might need to adjust this part based on how your coordinator is structured
+    # and how it provides access to device/client information
+    name = entry.data.get(CONF_NAME)
+    options = coordinator.options  # Assuming your coordinator has an attribute 'options'
+    jvc_client = coordinator  # Assuming the coordinator acts as the client
+
+    # Setup your entities and add them
+    async_add_entities([JVCRemote(name, options, jvc_client)], update_before_add=False)
