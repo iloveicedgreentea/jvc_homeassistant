@@ -4,6 +4,7 @@ from collections.abc import Iterable
 import logging
 import asyncio
 from dataclasses import asdict
+import traceback
 
 from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator
 import voluptuous as vol
@@ -54,7 +55,6 @@ async def async_setup_platform(
         logger=_LOGGER,
     )
     # create a long lived connection
-    jvc_client.open_connection()
     async_add_entities(
         [
             JVCRemote(name, options, jvc_client),
@@ -95,6 +95,8 @@ class JVCRemote(RemoteEntity):
         # update background worker
         worker_handler = self.hass.loop.create_task(self.update_worker())
         self.tasks.append(worker_handler)
+        ping = self.hass.loop.create_task(self.ping_until_alive())
+        self.tasks.append(ping)
 
     async def async_will_remove_from_hass(self) -> None:
         """close the connection and cancel all tasks when the entity is removed"""
@@ -102,6 +104,44 @@ class JVCRemote(RemoteEntity):
         for task in self.tasks:
             if not task.done():
                 task.cancel()
+
+    async def ping_until_alive(self) -> None:
+        """ping unit until its alive. Once True, call open_connection"""
+        cmd = f"ping -c 1 -W 2 {self.host}"
+        sleep_interval = 5
+
+        while True:
+            try:
+                _LOGGER.debug("Pinging with cmd %s", cmd)
+                process = await asyncio.create_subprocess_shell(
+                    cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                )
+
+                await process.communicate()
+
+                # if ping works, turn it on and exit
+                if process.returncode == 0:
+                    _LOGGER.debug("ping success, turning on")
+                    await asyncio.sleep(2)
+                    result = await self.jvc_client.open_connection()
+                    _LOGGER.debug("open connection result: %s", result)
+                    if not result:
+                        _LOGGER.error("Could not open connection: %s", result)
+                    self._state = True
+
+                    return
+
+                # wait and continue
+                await asyncio.sleep(sleep_interval)
+                continue
+
+            except asyncio.CancelledError as err:
+                process.terminate()
+                await process.wait()
+                _LOGGER.error(err)
+            # intentionally broad
+            except Exception as err:
+                _LOGGER.error("some error happened with ping: %s", err)
 
     async def handle_queue(self):
         """
@@ -114,6 +154,8 @@ class JVCRemote(RemoteEntity):
                 # if the queue is not empty and we are not stopping
                 not self.command_queue.empty()
                 and not self.stop_processing_commands.is_set()
+                and not self.jvc_client.writer is None
+                and self.jvc_client.connection_open is True
             ):
                 command: Iterable[str] = await self.command_queue.get()
                 _LOGGER.debug("sending queue command %s", command)
@@ -150,7 +192,11 @@ class JVCRemote(RemoteEntity):
 
     async def process_dlq(self):
         """Process the dead letter queue"""
-        if not self.dead_letter_queue.empty():
+        if (
+            not self.dead_letter_queue.empty()
+            and not self.jvc_client.writer is None
+            and self.jvc_client.connection_open is True
+        ):
             command: Iterable[str] = await self.dead_letter_queue.get()
             try:
                 # lock the command
@@ -174,8 +220,12 @@ class JVCRemote(RemoteEntity):
         for attempt in range(max_retries):
             try:
                 await self.lock.acquire()
-                await self.jvc_client.exec_command(command)
-                _LOGGER.info("Command executed successfully: %s", command)
+                err, res = await self.jvc_client.exec_command(command)
+                if res:
+                    _LOGGER.info("Command executed successfully: %s", command)
+                else:
+                    # getting a false means its not worth retrying
+                    _LOGGER.error("Command failed: %s", err)
                 break  # Exit the retry loop upon success
             # intentionally catching all exceptions for dlq
             except Exception as err:  # pylint: disable=broad-except
@@ -196,16 +246,27 @@ class JVCRemote(RemoteEntity):
     async def update_worker(self):
         """Gets a function and attribute from a queue and runs it."""
         while True:
-            if not self.stop_processing_commands.is_set():
+            if (
+                not self.stop_processing_commands.is_set()
+                and not self.jvc_client.writer is None
+                and self.jvc_client.connection_open is True
+            ):
                 # getter will be a function like get_source_status()
                 getter, attribute = await self.attribute_queue.get()
                 try:
                     # get lock
+                    _LOGGER.debug(
+                        "trying attribute %s with getter %s", attribute, getter
+                    )
                     await self.lock.acquire()
                     value = await getter()
+                    _LOGGER.debug("got value %s for attribute %s", value, attribute)
                     setattr(self.jvc_client.attributes, attribute, value)
                 except Exception as err:  # pylint: disable=broad-except
-                    _LOGGER.error("Error getting attribute: %s", err)
+                    error_traceback = traceback.format_exc()
+                    _LOGGER.error(
+                        "Error getting attribute: %s -- %s", err, error_traceback
+                    )
                 finally:
                     self.attribute_queue.task_done()
                     self.lock.release()
@@ -243,21 +304,27 @@ class JVCRemote(RemoteEntity):
 
     async def async_turn_on(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power on command."""
-
+        await self.lock.acquire()
         await self.jvc_client.power_on()
-        await self.stop_processing_commands.clear()
+        self.lock.release()
+        self.stop_processing_commands.clear()
         self._state = True
 
     async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
-
+        await self.lock.acquire()
         await self.jvc_client.power_off()
-        await self.stop_processing_commands.set()
+        self.lock.release()
+        self.stop_processing_commands.set()
         self._state = False
 
     async def async_update(self):
         """Retrieve latest state."""
-        if not self.stop_processing_commands.is_set():
+        if (
+            not self.stop_processing_commands.is_set()
+            and not self.jvc_client.writer is None
+            and self.jvc_client.connection_open is True
+        ):
             # common stuff
             attribute_getters = [
                 (self.jvc_client.is_on, "power_state"),
@@ -276,28 +343,34 @@ class JVCRemote(RemoteEntity):
             # determine how to proceed based on above
 
             if self.jvc_client.attributes.signal_status == "signal":
-                attribute_getters.append(
-                    (self.jvc_client.get_content_type, "content_type"),
-                    (self.jvc_client.get_content_type_trans, "content_type_trans"),
-                    (self.jvc_client.get_input_mode, "input_mode"),
+                attribute_getters.extend(
+                    [
+                        (self.jvc_client.get_content_type, "content_type"),
+                        (self.jvc_client.get_content_type_trans, "content_type_trans"),
+                        (self.jvc_client.get_input_mode, "input_mode"),
+                    ]
                 )
             if not "Unsupported" in self.jvc_client.model_family:
-                attribute_getters.append(
-                    (self.jvc_client.get_install_mode, "installation_mode"),
-                    (self.jvc_client.get_aspect_ratio, "aspect_ratio"),
-                    (self.jvc_client.get_color_mode, "color_mode"),
-                    (self.jvc_client.get_input_level, "input_level"),
-                    (self.jvc_client.get_mask_mode, "mask_mode"),
+                attribute_getters.extend(
+                    [
+                        (self.jvc_client.get_install_mode, "installation_mode"),
+                        (self.jvc_client.get_aspect_ratio, "aspect_ratio"),
+                        (self.jvc_client.get_color_mode, "color_mode"),
+                        (self.jvc_client.get_input_level, "input_level"),
+                        (self.jvc_client.get_mask_mode, "mask_mode"),
+                    ]
                 )
             if any(x in self.jvc_client.model_family for x in ["NX9", "NZ"]):
                 attribute_getters.append(
                     (self.jvc_client.get_eshift_mode, "eshift"),
                 )
             if "NZ" in self.jvc_client.model_family:
-                attribute_getters.append(
-                    (self.jvc_client.get_laser_power, "laser_power"),
-                    (self.jvc_client.get_laser_mode, "laser_mode"),
-                    (self.jvc_client.is_ll_on, "low_latency"),
+                attribute_getters.extend(
+                    [
+                        (self.jvc_client.get_laser_power, "laser_power"),
+                        (self.jvc_client.get_laser_mode, "laser_mode"),
+                        (self.jvc_client.is_ll_on, "low_latency"),
+                    ]
                 )
             else:
                 attribute_getters.append(
@@ -322,10 +395,12 @@ class JVCRemote(RemoteEntity):
                             "theater_optimizer",
                         ),
                     )
-                attribute_getters.append(
-                    (self.jvc_client.get_hdr_processing, "hdr_processing"),
-                    (self.jvc_client.get_hdr_level, "hdr_level"),
-                    (self.jvc_client.get_hdr_data, "hdr_data"),
+                attribute_getters.extend(
+                    [
+                        (self.jvc_client.get_hdr_processing, "hdr_processing"),
+                        (self.jvc_client.get_hdr_level, "hdr_level"),
+                        (self.jvc_client.get_hdr_data, "hdr_data"),
+                    ]
                 )
 
             # get all the updates
