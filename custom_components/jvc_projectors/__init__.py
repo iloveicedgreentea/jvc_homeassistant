@@ -10,28 +10,28 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_TIMEOUT,
     CONF_SCAN_INTERVAL,
-    Platform
+    Platform,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, PLATFORM_SCHEMA
+
 _LOGGER = logging.getLogger("JVC_projectors")
-# PLATFORMS: list[Platform] = [Platform.REMOTE]
 
 
 async def async_setup_entry(hass, entry):
     """Set up JVC Projector from a config entry."""
     host = entry.data.get(CONF_HOST)
     password = entry.data.get(CONF_PASSWORD)
-    scan_interval = entry.data.get(CONF_SCAN_INTERVAL)
+
     timeout = entry.data.get(CONF_TIMEOUT, 3)
     port = 20554
-    _LOGGER.debug(f"Setting up JVC Projector with host: {host}, password: {password}, scan_interval: {scan_interval}, timeout: {timeout}")
+    _LOGGER.debug(f"Setting up JVC Projector with host: {host}")
     options = JVCInput(host, password, port, timeout)
     # Create a coordinator or directly set up your entities with the provided information
     coordinator = JVCProjectorCoordinator(options, _LOGGER)
-    _LOGGER.debug("set up coordinator")
+    _LOGGER.debug("Set up coordinator")
     # Store the coordinator in hass.data for use by your platform (e.g., remote)
     hass.data[DOMAIN] = coordinator
     # Forward the setup to the platform, e.g., remote
@@ -41,15 +41,17 @@ async def async_setup_entry(hass, entry):
     _LOGGER.debug(hass.data[DOMAIN])
     return True
 
+
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the component from configuration.yaml."""
-    _LOGGER.debug("Setting up JVC Projector from configuration.yaml")
     if DOMAIN not in config:
         return True
-    _LOGGER.debug(config[DOMAIN])
     for conf in config[DOMAIN]:
         # Check if an entry for this configuration already exists
-        if any(entry.data.get(PLATFORM_SCHEMA) == conf[PLATFORM_SCHEMA] for entry in hass.config_entries.async_entries(DOMAIN)):
+        if any(
+            entry.data.get(PLATFORM_SCHEMA) == conf[PLATFORM_SCHEMA]
+            for entry in hass.config_entries.async_entries(DOMAIN)
+        ):
             continue
 
         # If the entry does not exist, create a new config entry

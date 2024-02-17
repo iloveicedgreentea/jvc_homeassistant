@@ -20,48 +20,24 @@ from homeassistant.config_entries import ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
-# Validation of the user's configuration
-
-
-
-# async def async_setup_platform(
-#     hass: HomeAssistant,
-#     config: ConfigType,
-#     async_add_entities: AddEntitiesCallback,
-#     discovery_info: DiscoveryInfoType = None,
-# ) -> None:
-#     """Set up platform."""
-#     options = JVCInput(
-#         config.get(CONF_HOST),
-#         config.get(CONF_PASSWORD),
-#         20554,
-#         int(config.get(CONF_TIMEOUT, 3)),
-#     )
-#     name = config.get(CONF_NAME)
-#     jvc_client = JVCProjectorCoordinator(
-#         options,
-#         logger=_LOGGER,
-#     )
-#     # create a long lived connection
-#     async_add_entities(
-#         [
-#             JVCRemote(name, options, jvc_client),
-#         ]
-#     )
-
 
 class JVCRemote(RemoteEntity):
     """Implements the interface for JVC Remote in HA."""
 
     def __init__(
         self,
+        entry,
         name: str,
         options: JVCInput,
         jvc_client: JVCProjectorCoordinator = None,
     ) -> None:
         """JVC Init."""
+        super().__init__()
         self._name = name
         self._host = options.host
+        self.entry = entry
+        # tie the entity to the config flow
+        self._attr_unique_id = entry.entry_id
 
         self.jvc_client = jvc_client
         # attributes
@@ -416,7 +392,9 @@ class JVCRemote(RemoteEntity):
         await self.command_queue.put(command)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+):
     """Set up JVC Remote based on a config entry."""
     # Retrieve your setup data or coordinator from hass.data
     coordinator = hass.data[DOMAIN]
@@ -424,9 +402,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     # You might need to adjust this part based on how your coordinator is structured
     # and how it provides access to device/client information
     name = entry.data.get(CONF_NAME)
-    options = coordinator.options  # Assuming your coordinator has an attribute 'options'
+    options = (
+        coordinator.options
+    )  # Assuming your coordinator has an attribute 'options'
     jvc_client = coordinator  # Assuming the coordinator acts as the client
 
     # Setup your entities and add them
     _LOGGER.debug("Setting up JVC Projector with options: %s", options)
-    async_add_entities([JVCRemote(name, options, jvc_client)], update_before_add=False)
+    async_add_entities(
+        [JVCRemote(entry, name, options, jvc_client)], update_before_add=False
+    )

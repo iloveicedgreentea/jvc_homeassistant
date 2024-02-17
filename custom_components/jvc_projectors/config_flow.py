@@ -14,7 +14,7 @@ import homeassistant.helpers.config_validation as cv
 from .const import DOMAIN  # Import the domain constant
 
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.warning("config_flow.py")
+
 
 class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for JVC Projector."""
@@ -24,16 +24,14 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         """Handle the initial step."""
         errors = {}
-        _LOGGER.warning("user input %s", user_input)
+        _LOGGER.debug("user input is %s", user_input)
         if user_input is not None:
             # TODO: Implement actual validation of user input
             valid = True  # Replace with actual validation logic
 
             if valid:
-                _LOGGER.warning("setting up unique id")
                 await self.async_set_unique_id(user_input[CONF_HOST])
                 self._abort_if_unique_id_configured()
-                _LOGGER.warning("done unique id")
                 return self.async_create_entry(
                     title=user_input[CONF_NAME], data=user_input
                 )
@@ -45,7 +43,7 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_NAME): str,
                 vol.Required(CONF_HOST): str,
                 vol.Optional(CONF_PASSWORD): str,
-                vol.Optional(CONF_TIMEOUT, default=3): int
+                vol.Optional(CONF_TIMEOUT, default=3): int,
             }
         )
 
@@ -55,12 +53,12 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_import(self, import_config):
         """Handle the import of a configuration from YAML."""
-        _LOGGER.warning("importing JVC Projector")
-        _LOGGER.warning(import_config)
+        _LOGGER.debug("importing JVC Projector")
+        _LOGGER.debug(import_config)
         unique_id = import_config.get(CONF_HOST)
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()
-        _LOGGER.warning("unique id: %s", unique_id)
+        _LOGGER.debug("unique id: %s", unique_id)
 
         return self.async_create_entry(
             title=import_config.get(CONF_NAME, "JVC Projector"), data=import_config
@@ -78,18 +76,26 @@ class JVCOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry):
         """Initialize JVC options flow."""
         self.config_entry = config_entry
-        _LOGGER.warning("JVCOptionsFlow init")
+        _LOGGER.debug("JVCOptionsFlow init")
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
-        _LOGGER.warning("JVCOptionsFlow init step")
+        _LOGGER.debug("JVCOptionsFlow init step")
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        options = {
-            vol.Optional(
-                CONF_TIMEOUT, default=self.config_entry.options.get(CONF_TIMEOUT, 3)
-            ): int
-        }
+        current_config = {**self.config_entry.data, **self.config_entry.options}
+        options_schema = vol.Schema(
+            {
+                vol.Optional(CONF_NAME, default=current_config.get(CONF_NAME)): str,
+                vol.Optional(CONF_HOST, default=current_config.get(CONF_HOST)): str,
+                vol.Optional(
+                    CONF_PASSWORD, default=current_config.get(CONF_PASSWORD)
+                ): str,
+                vol.Optional(
+                    CONF_TIMEOUT, default=current_config.get(CONF_TIMEOUT, 3)
+                ): int,
+            }
+        )
 
-        return self.async_show_form(step_id="init", data_schema=vol.Schema(options))
+        return self.async_show_form(step_id="init", data_schema=options_schema)
