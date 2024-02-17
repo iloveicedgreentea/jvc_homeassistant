@@ -294,7 +294,10 @@ class JVCRemote(RemoteEntity):
         if self._state:
             return asdict(self.jvc_client.attributes)
 
-        return {"power_state": self._state}
+        return {
+            "power_state": self._state,
+            "model": self.jvc_client.model_family,
+            }
 
     @property
     def is_on(self):
@@ -326,93 +329,92 @@ class JVCRemote(RemoteEntity):
             and self.jvc_client.connection_open is True
         ):
             # common stuff
-            attribute_getters = [
-                (self.jvc_client.is_on, "power_state"),
-                (self.jvc_client.get_source_status, "signal_status"),
-                (self.jvc_client.get_picture_mode, "picture_mode"),
-                (self.jvc_client.get_lamp_time, "lamp_time"),
-                (self.jvc_client.get_software_version, "software_version"),
-            ]
-            # get power, signal and picture state
-            for getter, name in attribute_getters:
-                await self.attribute_queue.put((getter, name))
-
-            # wait for queue to empty
-            await self.attribute_queue.join()
-
-            # determine how to proceed based on above
-
-            if self.jvc_client.attributes.signal_status == "signal":
+            attribute_getters = []
+            _LOGGER.debug("updating state")
+            self._state = await self.jvc_client.is_on()
+            if self._state:
+                _LOGGER.debug("getting attributes")
                 attribute_getters.extend(
-                    [
-                        (self.jvc_client.get_content_type, "content_type"),
-                        (self.jvc_client.get_content_type_trans, "content_type_trans"),
-                        (self.jvc_client.get_input_mode, "input_mode"),
-                    ]
+                    (self.jvc_client.get_source_status, "signal_status"),
+                    (self.jvc_client.get_picture_mode, "picture_mode"),
+                    (self.jvc_client.get_lamp_time, "lamp_time"),
+                    (self.jvc_client.get_software_version, "software_version"),
                 )
-            if not "Unsupported" in self.jvc_client.model_family:
-                attribute_getters.extend(
-                    [
-                        (self.jvc_client.get_install_mode, "installation_mode"),
-                        (self.jvc_client.get_aspect_ratio, "aspect_ratio"),
-                        (self.jvc_client.get_color_mode, "color_mode"),
-                        (self.jvc_client.get_input_level, "input_level"),
-                        (self.jvc_client.get_mask_mode, "mask_mode"),
-                    ]
-                )
-            if any(x in self.jvc_client.model_family for x in ["NX9", "NZ"]):
-                attribute_getters.append(
-                    (self.jvc_client.get_eshift_mode, "eshift"),
-                )
-            if "NZ" in self.jvc_client.model_family:
-                attribute_getters.extend(
-                    [
-                        (self.jvc_client.get_laser_power, "laser_power"),
-                        (self.jvc_client.get_laser_mode, "laser_mode"),
-                        (self.jvc_client.is_ll_on, "low_latency"),
-                    ]
-                )
-            else:
-                attribute_getters.append(
-                    (self.jvc_client.get_lamp_power, "lamp_power"),
-                )
+                # determine how to proceed based on above
 
-            for getter, name in attribute_getters:
-                await self.attribute_queue.put((getter, name))
-
-            # get hdr attributes
-            await self.attribute_queue.join()
-
-            # HDR stuff
-            if any(
-                x in self.jvc_client.attributes.content_type_trans
-                for x in ["hdr", "hlg"]
-            ):
-                if "NZ" in self.jvc_client.model_family:
-                    attribute_getters.append(
-                        (
-                            self.jvc_client.get_theater_optimizer_state,
-                            "theater_optimizer",
-                        ),
+                if self.jvc_client.attributes.signal_status == "signal":
+                    attribute_getters.extend(
+                        [
+                            (self.jvc_client.get_content_type, "content_type"),
+                            (
+                                self.jvc_client.get_content_type_trans,
+                                "content_type_trans",
+                            ),
+                            (self.jvc_client.get_input_mode, "input_mode"),
+                        ]
                     )
-                attribute_getters.extend(
-                    [
-                        (self.jvc_client.get_hdr_processing, "hdr_processing"),
-                        (self.jvc_client.get_hdr_level, "hdr_level"),
-                        (self.jvc_client.get_hdr_data, "hdr_data"),
-                    ]
-                )
+                if not "Unsupported" in self.jvc_client.model_family:
+                    attribute_getters.extend(
+                        [
+                            (self.jvc_client.get_install_mode, "installation_mode"),
+                            (self.jvc_client.get_aspect_ratio, "aspect_ratio"),
+                            (self.jvc_client.get_color_mode, "color_mode"),
+                            (self.jvc_client.get_input_level, "input_level"),
+                            (self.jvc_client.get_mask_mode, "mask_mode"),
+                        ]
+                    )
+                if any(x in self.jvc_client.model_family for x in ["NX9", "NZ"]):
+                    attribute_getters.append(
+                        (self.jvc_client.get_eshift_mode, "eshift"),
+                    )
+                if "NZ" in self.jvc_client.model_family:
+                    attribute_getters.extend(
+                        [
+                            (self.jvc_client.get_laser_power, "laser_power"),
+                            (self.jvc_client.get_laser_mode, "laser_mode"),
+                            (self.jvc_client.is_ll_on, "low_latency"),
+                        ]
+                    )
+                else:
+                    attribute_getters.append(
+                        (self.jvc_client.get_lamp_power, "lamp_power"),
+                    )
 
-            # get all the updates
-            for getter, name in attribute_getters:
-                await self.attribute_queue.put((getter, name))
+                for getter, name in attribute_getters:
+                    await self.attribute_queue.put((getter, name))
 
-            await self.attribute_queue.join()
+                # get hdr attributes
+                await self.attribute_queue.join()
 
-            # set the model
+                # HDR stuff
+                if any(
+                    x in self.jvc_client.attributes.content_type_trans
+                    for x in ["hdr", "hlg"]
+                ):
+                    if "NZ" in self.jvc_client.model_family:
+                        attribute_getters.append(
+                            (
+                                self.jvc_client.get_theater_optimizer_state,
+                                "theater_optimizer",
+                            ),
+                        )
+                    attribute_getters.extend(
+                        [
+                            (self.jvc_client.get_hdr_processing, "hdr_processing"),
+                            (self.jvc_client.get_hdr_level, "hdr_level"),
+                            (self.jvc_client.get_hdr_data, "hdr_data"),
+                        ]
+                    )
+
+                # get all the updates
+                for getter, name in attribute_getters:
+                    await self.attribute_queue.put((getter, name))
+
+                await self.attribute_queue.join()
+            else:
+                _LOGGER.debug("PJ is off")
+                # set the model
             self.jvc_client.attributes.model = self.jvc_client.model_family
-            # just in case
-            self._state = self.jvc_client.attributes.power_state
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
