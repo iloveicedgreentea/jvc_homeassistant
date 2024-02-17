@@ -256,7 +256,13 @@ class JVCRemote(RemoteEntity):
         """Return extra state attributes."""
         # Separate views for models to be cleaner
         if self._state:
-            return asdict(self.jvc_client.attributes)
+            all_attr = asdict(self.jvc_client.attributes)
+            # remove lamp stuff if its a laser
+            if "NZ" in self.jvc_client.model_family:
+                all_attr.pop("lamp_power")
+                all_attr.pop("lamp_time")
+
+            return all_attr
 
         return {
             "power_state": self._state,
@@ -305,7 +311,6 @@ class JVCRemote(RemoteEntity):
                     [
                         (self.jvc_client.get_source_status, "signal_status"),
                         (self.jvc_client.get_picture_mode, "picture_mode"),
-                        (self.jvc_client.get_lamp_time, "lamp_time"),
                         (self.jvc_client.get_software_version, "software_version"),
                     ]
                 )
@@ -342,11 +347,13 @@ class JVCRemote(RemoteEntity):
                             (self.jvc_client.get_laser_power, "laser_power"),
                             (self.jvc_client.get_laser_mode, "laser_mode"),
                             (self.jvc_client.is_ll_on, "low_latency"),
+                            (self.jvc_client.get_lamp_time, "laser_time"),
                         ]
                     )
                 else:
                     attribute_getters.append(
                         (self.jvc_client.get_lamp_power, "lamp_power"),
+                        (self.jvc_client.get_lamp_time, "lamp_time"),
                     )
 
                 for getter, name in attribute_getters:

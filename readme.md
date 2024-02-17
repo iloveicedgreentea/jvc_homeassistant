@@ -6,6 +6,7 @@ This is the Home Assistant JVC Component implementing my [JVC library](https://g
 
 All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_improved) including:
 
+- Config Flow/UI setup
 - Power
 - Picture Modes
 - Laser power and dimming
@@ -19,29 +20,16 @@ Note: Only NX and NZ series are officially supported but this should work with a
 
 ## Installation
 
-This is currently only a custom component. Unlikely to make it into HA core because their process is just too burdensome and I strongly disagree with their deployment model for integrations.
+This is currently only a custom component. Unlikely to make it into HA core because their process is just too burdensome.
 
-Install HACS, then install the component by adding this as a custom repo
-https://hacs.xyz/docs/faq/custom_repositories
+Install HACS, then install the component by adding this repository as a custom repo. More details here - https://hacs.xyz/docs/faq/custom_repositories
 
-You can also just copy all the files into your custom_components folder but then you won't get automatic updates.
+You can also just copy all the files into your custom_components folder but then you won't have automatic updates.
 
 ### Home Assistant Setup
+This uses Config Flow. Install the custom component, restart, then add an integration as you normally do. Search JVC, and find the one that shows a box icon next to it. There is an official JVC Integration but it is limited and unrelated to this one.
 
-```yaml
-# configuration.yaml
-remote:
-  - platform: jvc_projectors
-    name: { entity name }
-    password: { password } (optional for non-NZ)
-    host: { IP addr }
-    timeout: { seconds } (optional defaults to 3)
-    scan_interval: 15 # recommend 15-30. Attributes will poll in this interval
-```
-
-If you set your scan interval too small you will get update errors because JVC projectors only accept a single command at a time so async is not possible. 
-
-You can use the attributes in sensors, automations, etc.
+*upon HA restart, it will automatically reconnect. No action is needed from you*
 
 ### Adding attributes as sensors
 
@@ -348,11 +336,9 @@ sensor:
         {% endif %}
 ```
 
-Add this to lovelace
+Here is something to get you started. You can add buttons and sensors as needed. 
 
 ```yaml
-square: false
-columns: 3
 type: grid
 cards:
   - type: button
@@ -362,6 +348,17 @@ cards:
     show_state: true
     show_name: true
     icon: mdi:power
+  - type: button
+    tap_action:
+      action: call-service
+      service: jvc_projectors.info
+      service_data: {}
+      target:
+        entity_id: remote.nz7
+    show_icon: false
+    name: Info
+    hold_action:
+      action: none
   - type: button
     tap_action:
       action: call-service
@@ -375,6 +372,23 @@ cards:
     icon: mdi:arrow-up
     hold_action:
       action: none
+  - type: button
+    tap_action:
+      action: call-service
+      service: remote.send_command
+      service_data:
+        command: menu,menu
+      target:
+        entity_id: remote.nz7
+    show_name: true
+    show_icon: false
+    name: Menu
+    hold_action:
+      action: none
+  - type: button
+    tap_action:
+      action: toggle
+    show_icon: false
   - type: button
     tap_action:
       action: none
@@ -395,9 +409,7 @@ cards:
         entity_id: remote.nz7
     show_name: false
     icon: mdi:arrow-left
-  - show_name: false
-    show_icon: true
-    type: button
+  - type: button
     tap_action:
       action: call-service
       service: remote.send_command
@@ -406,8 +418,7 @@ cards:
       target:
         entity_id: remote.nz7
     name: OK
-    icon: mdi:checkbox-blank-circle
-    show_state: true
+    show_icon: false
   - type: button
     tap_action:
       action: call-service
@@ -418,6 +429,15 @@ cards:
         entity_id: remote.nz7
     show_name: false
     icon: mdi:arrow-right
+  - type: button
+    tap_action:
+      action: toggle
+    show_icon: false
+    show_name: false
+  - type: button
+    tap_action:
+      action: toggle
+    show_icon: false
   - type: button
     tap_action:
       action: call-service
@@ -440,54 +460,11 @@ cards:
     icon: mdi:arrow-down
   - type: button
     tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu,menu
-      target:
-        entity_id: remote.nz7
-    show_name: true
+      action: toggle
     show_icon: false
-    name: Menu
-    hold_action:
-      action: none
-  - show_name: true
-    show_icon: true
-    type: button
+  - type: button
     tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: installation_mode,mode5
-      target:
-        entity_id: remote.nz7
-    name: '17:9'
-    icon: mdi:television
-    show_state: false
-  - show_name: true
-    show_icon: true
-    type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: installation_mode,mode4
-      target:
-        entity_id: remote.nz7
-    name: 2.4:1
-    icon: mdi:television
-    show_state: false
-  - show_name: true
-    show_icon: true
-    type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: installation_mode,mode2
-      target:
-        entity_id: remote.nz7
-    name: IMAX
-    icon: mdi:television
-    show_state: false
+      action: toggle
+    show_icon: false
+columns: 5
 ```

@@ -4,7 +4,7 @@
   "config_flow": true,
   "documentation": "https://github.com/iloveicedgreentea/jvc_homeassistant",
   "requirements": [
-    "pyjvc==4.0.0"
+    "pyjvc==4.1.0"
   ],
   "ssdp": [],
   "zeroconf": [],
