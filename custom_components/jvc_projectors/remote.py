@@ -297,7 +297,7 @@ class JVCRemote(RemoteEntity):
         return {
             "power_state": self._state,
             "model": self.jvc_client.model_family,
-            }
+        }
 
     @property
     def is_on(self):
@@ -335,10 +335,12 @@ class JVCRemote(RemoteEntity):
             if self._state:
                 _LOGGER.debug("getting attributes")
                 attribute_getters.extend(
-                    (self.jvc_client.get_source_status, "signal_status"),
-                    (self.jvc_client.get_picture_mode, "picture_mode"),
-                    (self.jvc_client.get_lamp_time, "lamp_time"),
-                    (self.jvc_client.get_software_version, "software_version"),
+                    [
+                        (self.jvc_client.get_source_status, "signal_status"),
+                        (self.jvc_client.get_picture_mode, "picture_mode"),
+                        (self.jvc_client.get_lamp_time, "lamp_time"),
+                        (self.jvc_client.get_software_version, "software_version"),
+                    ]
                 )
                 # determine how to proceed based on above
 
