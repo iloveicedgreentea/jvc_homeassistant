@@ -10,6 +10,7 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
 )
 import homeassistant.helpers.config_validation as cv
+from jvc_projector.jvc_projector import JVCProjectorCoordinator, JVCInput
 
 from .const import DOMAIN  # Import the domain constant
 
@@ -26,8 +27,11 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         _LOGGER.debug("user input is %s", user_input)
         if user_input is not None:
-            # TODO: Implement actual validation of user input
-            valid = True  # Replace with actual validation logic
+            host = user_input.get(CONF_HOST)
+            password = user_input.get(CONF_PASSWORD)
+            timeout = user_input.get(CONF_TIMEOUT, 3)
+
+            valid = await self.validate_setup(host, password, timeout)
 
             if valid:
                 await self.async_set_unique_id(user_input[CONF_HOST])
@@ -50,6 +54,20 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user", data_schema=data_schema, errors=errors
         )
+
+    async def validate_setup(self, host: str, password: str, timeout: int) -> bool:
+        """return True if the projector connects"""
+        try:
+            options = JVCInput(host, password, 20554, timeout)
+            coordinator = JVCProjectorCoordinator(options)
+            res = await coordinator.open_connection()
+            if res:
+                await coordinator.close_connection()
+                return True
+        except Exception as e:
+            _LOGGER.error("Error validating JVC Projector setup: %s", e)
+            return False
+        return False
 
     async def async_step_import(self, import_config):
         """Handle the import of a configuration from YAML."""

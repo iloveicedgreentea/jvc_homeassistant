@@ -3,6 +3,7 @@
 from __future__ import annotations
 from jvc_projector.jvc_projector import JVCProjectorCoordinator, JVCInput
 import logging
+import asyncio
 from homeassistant import config_entries
 from homeassistant.const import (
     CONF_HOST,
@@ -39,7 +40,14 @@ async def async_setup_entry(hass, entry):
         hass.config_entries.async_forward_entry_setup(entry, Platform.REMOTE)
     )
     _LOGGER.debug(hass.data[DOMAIN])
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     return True
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload JVC Projector configuration entry."""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
@@ -62,3 +70,21 @@ async def async_setup(hass: HomeAssistant, config: dict):
         )
 
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Handle unloading of JVC Projector integration."""
+    # Unload your integration's platforms (e.g., 'remote', 'sensor', etc.)
+    _LOGGER.debug("Unloading JVC Projector integration")
+    try:
+        coordinator: JVCProjectorCoordinator = hass.data[DOMAIN]
+        await coordinator.close_connection()
+    except Exception as e:
+        _LOGGER.error("Error closing JVC Projector connection - %s", e)
+    unload_ok = await hass.config_entries.async_forward_entry_unload(entry, Platform.REMOTE)
+
+    # If you have other resources to unload (listeners, services, etc.), do it here
+    _LOGGER.debug("Unloaded JVC Projector integration")
+    # Return True if unload was successful
+    hass.data.pop(DOMAIN)
+    return unload_ok

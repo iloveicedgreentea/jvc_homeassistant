@@ -64,7 +64,7 @@ class JVCRemote(RemoteEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """close the connection and cancel all tasks when the entity is removed"""
-        self.jvc_client.close_connection()
+        await self.jvc_client.close_connection()
         for task in self.tasks:
             if not task.done():
                 task.cancel()
