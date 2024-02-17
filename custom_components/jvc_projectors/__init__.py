@@ -10,6 +10,7 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_TIMEOUT,
     CONF_SCAN_INTERVAL,
+    Platform
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -26,26 +27,26 @@ async def async_setup_entry(hass, entry):
     scan_interval = entry.data.get(CONF_SCAN_INTERVAL)
     timeout = entry.data.get(CONF_TIMEOUT, 3)
     port = 20554
-
+    _LOGGER.debug(f"Setting up JVC Projector with host: {host}, password: {password}, scan_interval: {scan_interval}, timeout: {timeout}")
     options = JVCInput(host, password, port, timeout)
     # Create a coordinator or directly set up your entities with the provided information
     coordinator = JVCProjectorCoordinator(options, _LOGGER)
-
+    _LOGGER.debug("set up coordinator")
     # Store the coordinator in hass.data for use by your platform (e.g., remote)
     hass.data[DOMAIN] = coordinator
-
     # Forward the setup to the platform, e.g., remote
     hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, "remote")
+        hass.config_entries.async_forward_entry_setup(entry, Platform.REMOTE)
     )
-
+    _LOGGER.debug(hass.data[DOMAIN])
     return True
 
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the component from configuration.yaml."""
+    _LOGGER.debug("Setting up JVC Projector from configuration.yaml")
     if DOMAIN not in config:
         return True
-
+    _LOGGER.debug(config[DOMAIN])
     for conf in config[DOMAIN]:
         # Check if an entry for this configuration already exists
         if any(entry.data.get(PLATFORM_SCHEMA) == conf[PLATFORM_SCHEMA] for entry in hass.config_entries.async_entries(DOMAIN)):

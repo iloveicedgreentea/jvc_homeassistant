@@ -419,7 +419,7 @@ class JVCRemote(RemoteEntity):
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up JVC Remote based on a config entry."""
     # Retrieve your setup data or coordinator from hass.data
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = hass.data[DOMAIN]
 
     # You might need to adjust this part based on how your coordinator is structured
     # and how it provides access to device/client information

@@ -8,8 +8,7 @@
           "host": "Host",
           "name": "Name",
           "password": "Password (NZ+ series only)",
-          "timeout": "Timeout (Optional)",
-          "scan_interval": "Scan Interval - How frequently to poll attributes in seconds"
+          "timeout": "Timeout (Optional)"
         }
       }
     },
