@@ -428,4 +428,5 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     jvc_client = coordinator  # Assuming the coordinator acts as the client
 
     # Setup your entities and add them
+    _LOGGER.debug("Setting up JVC Projector with options: %s", options)
     async_add_entities([JVCRemote(name, options, jvc_client)], update_before_add=False)
