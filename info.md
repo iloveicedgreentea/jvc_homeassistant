@@ -6,6 +6,7 @@ This is the Home Assistant JVC Component implementing my [JVC library](https://g
 
 All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_improved) including:
 
+- Config Flow/UI setup
 - Power
 - Picture Modes
 - Laser power and dimming
@@ -19,23 +20,12 @@ Because everything is async, it will run each button/command in the order it rec
 
 This is currently only a custom component. Unlikely to make it into HA core because their process is just too burdensome.
 
-Install HACS, then install the component by adding this as a custom repo
-https://hacs.xyz/docs/faq/custom_repositories
+Install HACS, then install the component by adding this repository as a custom repo. More details here - https://hacs.xyz/docs/faq/custom_repositories
 
 You can also just copy all the files into your custom_components folder but then you won't have automatic updates.
 
 ### Home Assistant Setup
-
-```yaml
-# configuration.yaml
-remote:
-  - platform: jvc_projectors
-    name: { friendly name }
-    password: { password }
-    host: { IP addr }
-    timeout: { seconds } (optional)
-    scan_interval: 15 # recommend 15-30. Attributes will poll in this interval
-```
+This uses Config Flow. Install the custom component, restart, then add an integration as you normally do. Search JVC, and find the one that shows a box icon next to it. There is an official JVC Integration but it is limited and unrelated to this one.
 
 ## Useful Stuff
 
@@ -60,7 +50,7 @@ sensor:
         {% endif %}
 ```
 
-Add this to lovelace
+Here is something to get you started. You can add buttons and sensors as needed. 
 
 ```yaml
 type: grid
@@ -186,49 +176,6 @@ cards:
     tap_action:
       action: toggle
     show_icon: false
-  - type: button
-    tap_action:
-      action: toggle
-    show_icon: false
-  - type: button
-    tap_action:
-      action: call-service
-      service: jvc_projectors.gaming_mode_hdr
-      service_data: {}
-      target:
-        entity_id: remote.nz7
-    show_icon: false
-    show_name: true
-    hold_action:
-      action: none
-    name: Game HDR
-  - type: button
-    tap_action:
-      action: call-service
-      service: jvc_projectors.gaming_mode_sdr
-      service_data: {}
-      target:
-        entity_id: remote.nz7
-    show_icon: false
-    name: Game SDR
-  - type: button
-    tap_action:
-      action: call-service
-      service: jvc_projectors.hdr_picture_mode
-      service_data: {}
-      target:
-        entity_id: remote.nz7
-    show_icon: false
-    name: Film HDR
-  - type: button
-    tap_action:
-      action: call-service
-      service: jvc_projectors.sdr_picture_mode
-      service_data: {}
-      target:
-        entity_id: remote.nz7
-    show_icon: false
-    name: Film SDR
   - type: button
     tap_action:
       action: toggle
