@@ -328,6 +328,9 @@ class JVCRemote(RemoteEntity):
             and not self.jvc_client.writer is None
             and self.jvc_client.connection_open is True
         ):
+            # certain commands can only run at certain times
+            # if they fail (i.e grayed out on menu) JVC will simply time out. Bad UX
+            # have to add specific commands in a precise order
             # common stuff
             attribute_getters = []
             _LOGGER.debug("updating state")
@@ -415,8 +418,9 @@ class JVCRemote(RemoteEntity):
                 await self.attribute_queue.join()
             else:
                 _LOGGER.debug("PJ is off")
-                # set the model
+            # set the model and power
             self.jvc_client.attributes.model = self.jvc_client.model_family
+            self.jvc_client.attributes.power_state = self._state
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
