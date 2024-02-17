@@ -7,34 +7,21 @@ from dataclasses import asdict
 import traceback
 
 from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator
-import voluptuous as vol
-from .const import DOMAIN
-from homeassistant.components.remote import PLATFORM_SCHEMA, RemoteEntity
+
+from .const import DOMAIN, PLATFORM_SCHEMA
+from homeassistant.components.remote import RemoteEntity
 from homeassistant.const import (
-    CONF_HOST,
     CONF_NAME,
-    CONF_PASSWORD,
-    CONF_TIMEOUT,
-    CONF_SCAN_INTERVAL,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
+
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.config_entries import ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
 # Validation of the user's configuration
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {
-        vol.Required(CONF_NAME): cv.string,
-        vol.Required(CONF_HOST): cv.string,
-        vol.Optional(CONF_PASSWORD): cv.string,
-        vol.Required(CONF_SCAN_INTERVAL): cv.time_period,
-        vol.Optional(CONF_TIMEOUT): cv.positive_int,
-    }
-)
+
 
 
 # async def async_setup_platform(

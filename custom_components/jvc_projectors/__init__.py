@@ -3,6 +3,7 @@
 from __future__ import annotations
 from jvc_projector.jvc_projector import JVCProjectorCoordinator, JVCInput
 import logging
+from homeassistant import config_entries
 from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
@@ -13,7 +14,7 @@ from homeassistant.const import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import DOMAIN, PLATFORM_SCHEMA
 _LOGGER = logging.getLogger("JVC_projectors")
 # PLATFORMS: list[Platform] = [Platform.REMOTE]
 
@@ -37,5 +38,24 @@ async def async_setup_entry(hass, entry):
     hass.async_create_task(
         hass.config_entries.async_forward_entry_setup(entry, "remote")
     )
+
+    return True
+
+async def async_setup(hass: HomeAssistant, config: dict):
+    """Set up the component from configuration.yaml."""
+    if DOMAIN not in config:
+        return True
+
+    for conf in config[DOMAIN]:
+        # Check if an entry for this configuration already exists
+        if any(entry.data.get(PLATFORM_SCHEMA) == conf[PLATFORM_SCHEMA] for entry in hass.config_entries.async_entries(DOMAIN)):
+            continue
+
+        # If the entry does not exist, create a new config entry
+        hass.async_create_task(
+            hass.config_entries.flow.async_init(
+                DOMAIN, context={"source": config_entries.SOURCE_IMPORT}, data=conf
+            )
+        )
 
     return True

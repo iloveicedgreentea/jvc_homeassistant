@@ -1,13 +1,13 @@
 import voluptuous as vol
 import logging
-from homeassistant import config_entries
+from homeassistant import config_entries, core
 from homeassistant.core import callback
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_TIMEOUT, CONF_SCAN_INTERVAL
 import homeassistant.helpers.config_validation as cv
 
-_LOGGER = logging.getLogger(__name__)
-
 from .const import DOMAIN  # Import the domain constant
+
+_LOGGER = logging.getLogger(__name__)
 
 class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for JVC Projector."""
@@ -19,13 +19,11 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Validate user input
-            host = user_input[CONF_HOST]
-            # TODO: Validate the connection to the projector
+            # TODO: Implement actual validation of user input
             valid = True  # Replace with actual validation logic
 
             if valid:
-                await self.async_set_unique_id(host)
+                await self.async_set_unique_id(user_input[CONF_HOST])
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title=user_input[CONF_NAME], data=user_input)
 
@@ -39,15 +37,20 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_SCAN_INTERVAL): cv.time_period,
         })
 
-        return self.async_show_form(
-            step_id="user", data_schema=data_schema, errors=errors
-        )
+        return self.async_show_form(step_id="user", data_schema=data_schema, errors=errors)
+
+    async def async_step_import(self, import_config):
+        """Handle the import of a configuration from YAML."""
+        unique_id = import_config.get(CONF_HOST)
+        await self.async_set_unique_id(unique_id)
+        self._abort_if_unique_id_configured()
+
+        return self.async_create_entry(title=import_config.get(CONF_NAME, "JVC Projector"), data=import_config)
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
         return JVCOptionsFlow(config_entry)
-
 
 class JVCOptionsFlow(config_entries.OptionsFlow):
     """Handle JVC options."""
