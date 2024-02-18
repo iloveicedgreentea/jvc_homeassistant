@@ -86,5 +86,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # If you have other resources to unload (listeners, services, etc.), do it here
     _LOGGER.debug("Unloaded JVC Projector integration")
     # Return True if unload was successful
-    hass.data.pop(DOMAIN)
+    try:
+        hass.data.pop(DOMAIN)
+    except KeyError:
+        pass
     return unload_ok

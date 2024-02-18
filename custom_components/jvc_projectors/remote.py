@@ -325,6 +325,8 @@ class JVCRemote(RemoteEntity):
                                 "content_type_trans",
                             ),
                             (self.jvc_client.get_input_mode, "input_mode"),
+                            (self.jvc_client.get_anamorphic, "anamophic_mode"),
+                            (self.jvc_client.get_source_display, "resolution"),
                         ]
                     )
                 if not "Unsupported" in self.jvc_client.model_family:
@@ -362,6 +364,12 @@ class JVCRemote(RemoteEntity):
                 # get hdr attributes
                 await self.attribute_queue.join()
 
+                # get laser value if fw is a least 3.0
+                if "NZ" in self.jvc_client.model_family:
+                    if float(self.jvc_client.attributes.software_version) >= 3.00:
+                        attribute_getters.append(
+                            (self.jvc_client.get_laser_value, "laser_value"),
+                        )
                 # HDR stuff
                 if any(
                     x in self.jvc_client.attributes.content_type_trans
