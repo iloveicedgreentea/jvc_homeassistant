@@ -9,6 +9,9 @@ import traceback
 from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator
 
 from .const import DOMAIN, PLATFORM_SCHEMA
+from homeassistant.core import CoreState, callback
+from homeassistant.helpers.storage import Storage
+
 from homeassistant.components.remote import RemoteEntity
 from homeassistant.const import (
     CONF_NAME,
@@ -19,6 +22,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+STATE_STORAGE_KEY = "jvc_projector_entity_state"
+STATE_STORAGE_VERSION = 1
 
 
 class JVCRemote(RemoteEntity):
@@ -51,9 +56,19 @@ class JVCRemote(RemoteEntity):
         self.stop_processing_commands = asyncio.Event()
         self.lock = asyncio.Lock()
 
+        # state storage
+        self._state_storage = Storage(
+            f"{DOMAIN}.{STATE_STORAGE_KEY}", version=STATE_STORAGE_VERSION
+        )
+
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
         # add the queue handler to the event loop
+
+        # load previous state used to determine to reconnect if HA was restarted AND powered on because it always responds to ping
+        state = await self._state_storage.async_load()
+        self._previously_connected = state.get("connected", False) if state else False
+
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
         # update background worker
@@ -64,13 +79,22 @@ class JVCRemote(RemoteEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """close the connection and cancel all tasks when the entity is removed"""
+        # close connection
         await self.jvc_client.close_connection()
+        # cancel all tasks
         for task in self.tasks:
             if not task.done():
                 task.cancel()
 
     async def ping_until_alive(self) -> None:
-        """ping unit until its alive. Once True, call open_connection"""
+        """ping unit until its alive if previously connected. Once True, call open_connection. Used when HA was restarted while PJ was on"""
+
+        if not self._previously_connected:
+            _LOGGER.debug(
+                "Projector was not previously connected, skipping reconnection."
+            )
+            return
+
         cmd = f"ping -c 1 -W 2 {self.host}"
         sleep_interval = 5
 
@@ -103,9 +127,11 @@ class JVCRemote(RemoteEntity):
                 process.terminate()
                 await process.wait()
                 _LOGGER.error(err)
+                return
             # intentionally broad
             except Exception as err:
                 _LOGGER.error("some error happened with ping: %s", err)
+                return
 
     async def handle_queue(self):
         """
@@ -279,18 +305,31 @@ class JVCRemote(RemoteEntity):
     async def async_turn_on(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power on command."""
         await self.lock.acquire()
-        await self.jvc_client.power_on()
-        self.lock.release()
-        self.stop_processing_commands.clear()
-        self._state = True
+
+        try:
+            await self.jvc_client.power_on()
+            self.stop_processing_commands.clear()
+            self._state = True
+            # save state
+            await self._state_storage.async_save(
+                {"connected": self.jvc_client.connection_open}
+            )
+        finally:
+            self.lock.release()
 
     async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
         await self.lock.acquire()
-        await self.jvc_client.power_off()
-        self.lock.release()
-        self.stop_processing_commands.set()
-        self._state = False
+        try:
+            await self.jvc_client.power_off()
+            self.stop_processing_commands.set()
+            self._state = False
+            # save state
+            await self._state_storage.async_save(
+                {"connected": self.jvc_client.connection_open}
+            )
+        finally:
+            self.lock.release()
 
     async def async_update(self):
         """Retrieve latest state."""
