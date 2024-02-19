@@ -5,10 +5,10 @@
       "user": {
         "title": "Connect to your JVC Projector",
         "data": {
-          "host": "Host",
           "name": "Name",
-          "password": "Password (NZ+ series only)",
-          "timeout": "Timeout (Optional)"
+          "host": "Host",
+          "password": "Password",
+          "timeout": "Timeout"
         }
       }
     },
@@ -17,6 +17,20 @@
     },
     "success": {
       "create_entry": "Successfully connected to your JVC Projector."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "JVC Projector Options",
+        "description": "Configure your JVC Projector settings.",
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "password": "Password",
+          "timeout": "Timeout"
+        }
+      }
     }
   }
 }
