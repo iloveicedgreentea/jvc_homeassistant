@@ -100,7 +100,7 @@ class JVCOptionsFlow(config_entries.OptionsFlow):
         """Manage the options."""
         _LOGGER.debug("JVCOptionsFlow init step")
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(title=user_input[CONF_NAME], data=user_input)
 
         current_config = {**self.config_entry.data, **self.config_entry.options}
         options_schema = vol.Schema(
