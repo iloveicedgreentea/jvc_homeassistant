@@ -303,26 +303,30 @@ class JVCRemote(RemoteEntity):
 
     async def async_turn_on(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power on command."""
+        self._state = True
         await self.lock.acquire()
 
         try:
             await self.jvc_client.power_on()
             self.stop_processing_commands.clear()
-            self._state = True
             # save state
             await self._state_storage.async_save(
                 {"connected": self.jvc_client.connection_open}
             )
+        except Exception as err:  # pylint: disable=broad-except
+            _LOGGER.error("Error turning on projector: %s", err)
+            self._state = False
         finally:
             self.lock.release()
 
     async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
+        self._state = False
         await self.lock.acquire()
+
         try:
             await self.jvc_client.power_off()
             self.stop_processing_commands.set()
-            self._state = False
             # save state
             await self._state_storage.async_save(
                 {"connected": self.jvc_client.connection_open}
