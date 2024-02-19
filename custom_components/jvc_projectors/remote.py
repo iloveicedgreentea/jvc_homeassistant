@@ -30,6 +30,7 @@ class JVCRemote(RemoteEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         entry,
         name: str,
         options: JVCInput,
@@ -54,6 +55,7 @@ class JVCRemote(RemoteEntity):
         self.attribute_queue = asyncio.Queue()
         self.stop_processing_commands = asyncio.Event()
         self.lock = asyncio.Lock()
+        self.hass = hass
 
         # state storage
         self._state_storage = Store(self.hass, STATE_STORAGE_VERSION, STATE_STORAGE_KEY)
@@ -466,5 +468,5 @@ async def async_setup_entry(
     # Setup your entities and add them
     _LOGGER.debug("Setting up JVC Projector with options: %s", options)
     async_add_entities(
-        [JVCRemote(entry, name, options, jvc_client)], update_before_add=False
+        [JVCRemote(hass, entry, name, options, jvc_client)], update_before_add=False
     )
