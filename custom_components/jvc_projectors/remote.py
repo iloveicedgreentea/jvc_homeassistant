@@ -9,8 +9,7 @@ import traceback
 from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator
 
 from .const import DOMAIN, PLATFORM_SCHEMA
-from homeassistant.core import CoreState, callback
-from homeassistant.helpers.storage import Storage
+from homeassistant.helpers.storage import Store
 
 from homeassistant.components.remote import RemoteEntity
 from homeassistant.const import (
@@ -57,9 +56,7 @@ class JVCRemote(RemoteEntity):
         self.lock = asyncio.Lock()
 
         # state storage
-        self._state_storage = Storage(
-            f"{DOMAIN}.{STATE_STORAGE_KEY}", version=STATE_STORAGE_VERSION
-        )
+        self._state_storage = Store(self.hass, STATE_STORAGE_VERSION, STATE_STORAGE_KEY)
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
