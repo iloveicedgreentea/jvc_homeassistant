@@ -32,14 +32,15 @@ async def async_setup_entry(hass, entry):
     options = JVCInput(host, password, port, timeout)
     # Create a coordinator or directly set up your entities with the provided information
     coordinator = JVCProjectorCoordinator(options, _LOGGER)
-    try:
-        res = await coordinator.open_connection()
-        if not res:
-            _LOGGER.error("Error setting up JVC Projector during async_setup_entry")
-            return False
-    except Exception as e:
-        _LOGGER.error("Error setting up JVC Projector during async_setup_entry - %s", e)
-        return False
+    # I dont want to open a connection unless its on because then I can't test
+    # try:
+    #     res = await coordinator.open_connection()
+    #     if not res:
+    #         _LOGGER.error("Error setting up JVC Projector during async_setup_entry")
+    #         return False
+    # except Exception as e:
+    #     _LOGGER.error("Error setting up JVC Projector during async_setup_entry - %s", e)
+    #     return False
 
     # Store the coordinator in hass.data for use by your platform (e.g., remote)
     hass.data[DOMAIN] = coordinator

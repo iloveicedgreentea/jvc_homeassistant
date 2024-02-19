@@ -267,6 +267,7 @@ class JVCRemote(RemoteEntity):
         return {
             "power_state": self._state,
             "model": self.jvc_client.model_family,
+            "connection_state": self.jvc_client.attributes.connection_active,
         }
 
     @property
