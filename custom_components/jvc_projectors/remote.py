@@ -353,9 +353,11 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
                 else:
-                    attribute_getters.append(
-                        (self.jvc_client.get_lamp_power, "lamp_power"),
-                        (self.jvc_client.get_lamp_time, "lamp_time"),
+                    attribute_getters.extend(
+                        [
+                            (self.jvc_client.get_lamp_power, "lamp_power"),
+                            (self.jvc_client.get_lamp_time, "lamp_time"),
+                        ]
                     )
 
                 for getter, name in attribute_getters:
@@ -367,8 +369,10 @@ class JVCRemote(RemoteEntity):
                 # get laser value if fw is a least 3.0
                 if "NZ" in self.jvc_client.model_family:
                     if float(self.jvc_client.attributes.software_version) >= 3.00:
-                        attribute_getters.append(
-                            (self.jvc_client.get_laser_value, "laser_value"),
+                        attribute_getters.extend(
+                            [
+                                (self.jvc_client.get_laser_value, "laser_value"),
+                            ]
                         )
                 # HDR stuff
                 if any(
