@@ -327,6 +327,7 @@ class JVCRemote(RemoteEntity):
         try:
             await self.jvc_client.power_off()
             self.stop_processing_commands.set()
+            self.jvc_client.attributes.connection_active = False
             # save state
             await self._state_storage.async_save(
                 {"connected": self.jvc_client.connection_open}
