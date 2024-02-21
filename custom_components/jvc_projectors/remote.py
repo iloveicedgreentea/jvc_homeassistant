@@ -93,7 +93,7 @@ class JVCRemote(RemoteEntity):
                 "Projector was not previously connected, skipping reconnection."
             )
             return
-
+        # TODO: attempt to send a power command to see if its physically on instead of doing state storage
         cmd = f"ping -c 1 -W 2 {self.host}"
         sleep_interval = 5
 
