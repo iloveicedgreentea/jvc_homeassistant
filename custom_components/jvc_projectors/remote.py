@@ -349,6 +349,8 @@ class JVCRemote(RemoteEntity):
             attribute_getters = []
             _LOGGER.debug("updating state")
             self._state = await self.jvc_client.is_on()
+            self.jvc_client.attributes.connection_active = self.jvc_client.writer is not None
+            
             if self._state:
                 _LOGGER.debug("getting attributes")
                 attribute_getters.extend(
@@ -369,7 +371,7 @@ class JVCRemote(RemoteEntity):
                                 "content_type_trans",
                             ),
                             (self.jvc_client.get_input_mode, "input_mode"),
-                            (self.jvc_client.get_anamorphic, "anamophic_mode"),
+                            (self.jvc_client.get_anamorphic, "anamorphic_mode"),
                             (self.jvc_client.get_source_display, "resolution"),
                         ]
                     )

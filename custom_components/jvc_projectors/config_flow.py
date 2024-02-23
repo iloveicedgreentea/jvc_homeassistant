@@ -60,12 +60,15 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             options = JVCInput(host, password, 20554, timeout)
             coordinator = JVCProjectorCoordinator(options)
+            _LOGGER.debug("Validating JVC Projector setup")
             res = await coordinator.open_connection()
             if res:
+                _LOGGER.debug("JVC Projector setup connection worked")
                 await coordinator.close_connection()
+                _LOGGER.debug("JVC Projector setup connection sucessfully closed")
                 return True
         except Exception as e:
-            _LOGGER.error("Error validating JVC Projector setup: %s", e)
+            _LOGGER.error("Error validating JVC Projector setup. Please check host and password: %s", e)
             return False
         return False
 
