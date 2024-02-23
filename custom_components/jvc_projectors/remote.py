@@ -350,7 +350,7 @@ class JVCRemote(RemoteEntity):
             _LOGGER.debug("updating state")
             self._state = await self.jvc_client.is_on()
             self.jvc_client.attributes.connection_active = self.jvc_client.writer is not None
-            
+
             if self._state:
                 _LOGGER.debug("getting attributes")
                 attribute_getters.extend(
@@ -362,7 +362,7 @@ class JVCRemote(RemoteEntity):
                 )
                 # determine how to proceed based on above
 
-                if self.jvc_client.attributes.signal_status == "signal":
+                if self.jvc_client.attributes.signal_status is True:
                     attribute_getters.extend(
                         [
                             (self.jvc_client.get_content_type, "content_type"),
