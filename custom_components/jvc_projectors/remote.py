@@ -79,7 +79,7 @@ class JVCRemote(RemoteEntity):
     async def async_will_remove_from_hass(self) -> None:
         """close the connection and cancel all tasks when the entity is removed"""
         # close connection
-        with await self.lock:
+        async with self.lock:
             await self.jvc_client.close_connection()
         # cancel all tasks
         for task in self.tasks:
@@ -112,7 +112,7 @@ class JVCRemote(RemoteEntity):
                 if process.returncode == 0:
                     _LOGGER.debug("ping success, turning on")
                     await asyncio.sleep(2)
-                    with await self.lock:
+                    async with self.lock:
                         result = await self.jvc_client.open_connection()
                     _LOGGER.debug("open connection result: %s", result)
                     if not result:
@@ -150,9 +150,9 @@ class JVCRemote(RemoteEntity):
                 and self.jvc_client.connection_open is True
             ):
                 # can be a command or a tuple[function, attribute]
-                command: Iterable[str] | tuple[Callable[[], str|int|bool|float], str] = (
-                    await self.command_queue.get()
-                )
+                command: (
+                    Iterable[str] | tuple[Callable[[], str | int | bool | float], str]
+                ) = await self.command_queue.get()
                 _LOGGER.debug("got queue item %s", command)
                 # if its a tuple its an attribute update
                 if isinstance(command, tuple):
@@ -202,11 +202,12 @@ class JVCRemote(RemoteEntity):
                 and self.jvc_client.connection_open is True
             ):
                 # this is just an async interface so the other processor doesnt become complicated
-                
+
                 # getter will be a Callable
                 getter, attribute = await self.attribute_queue.get()
                 # add to the command queue with a single interface
                 await self.command_queue.put((getter, attribute))
+
     @property
     def should_poll(self):
         """Poll."""
@@ -250,7 +251,7 @@ class JVCRemote(RemoteEntity):
         """Send the power on command."""
         self._state = True
         # TODO: does this need to be sent to queue
-        with await self.lock:
+        async with self.lock:
             try:
                 await self.jvc_client.power_on()
                 self.stop_processing_commands.clear()
@@ -266,7 +267,7 @@ class JVCRemote(RemoteEntity):
         """Send the power off command."""
         self._state = False
 
-        with await self.lock:
+        async with self.lock:
             try:
                 await self.jvc_client.power_off()
                 self.stop_processing_commands.set()
