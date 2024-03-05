@@ -68,8 +68,8 @@ class JVCRemote(RemoteEntity):
         # add the queue handler to the event loop
 
         # load previous state used to determine to reconnect if HA was restarted AND powered on because it always responds to ping
-        state = await self._state_storage.async_load()
-        self._previously_connected = state.get("connected", False) if state else False
+        # state = await self._state_storage.async_load()
+        # self._previously_connected = state.get("connected", False) if state else False
 
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
@@ -79,8 +79,7 @@ class JVCRemote(RemoteEntity):
     async def async_will_remove_from_hass(self) -> None:
         """close the connection and cancel all tasks when the entity is removed"""
         # close connection
-        async with self.lock:
-            await self.jvc_client.close_connection()
+        await self.jvc_client.close_connection()
         # cancel all tasks
         for task in self.tasks:
             if not task.done():
@@ -89,11 +88,11 @@ class JVCRemote(RemoteEntity):
     async def ping_until_alive(self) -> None:
         """ping unit until its alive if previously connected. Once True, call open_connection. Used when HA was restarted while PJ was on"""
 
-        if not self._previously_connected:
-            _LOGGER.debug(
-                "Projector was not previously connected, skipping reconnection."
-            )
-            return
+        # if not self._previously_connected:
+        #     _LOGGER.debug(
+        #         "Projector was not previously connected, skipping reconnection."
+        #     )
+        #     return
         # TODO: attempt to send a power command to see if its physically on instead of doing state storage
         # TODO: ping  only to see if its available, not to turn it on
         cmd = f"ping -c 1 -W 2 {self.host}"
@@ -110,10 +109,10 @@ class JVCRemote(RemoteEntity):
 
                 # if ping works, turn it on and exit
                 if process.returncode == 0:
+                    # TODO: if its physically on, use is_on() to check if its on, then set the state
                     _LOGGER.debug("ping success, turning on")
                     await asyncio.sleep(2)
-                    async with self.lock:
-                        result = await self.jvc_client.open_connection()
+                    result = await self.jvc_client.open_connection()
                     _LOGGER.debug("open connection result: %s", result)
                     if not result:
                         _LOGGER.error("Could not open connection: %s", result)
@@ -251,35 +250,33 @@ class JVCRemote(RemoteEntity):
         """Send the power on command."""
         self._state = True
         # TODO: does this need to be sent to queue
-        async with self.lock:
-            try:
-                await self.jvc_client.power_on()
-                self.stop_processing_commands.clear()
-                # save state
-                await self._state_storage.async_save(
-                    {"connected": self.jvc_client.connection_open}
-                )
-            except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.error("Error turning on projector: %s", err)
-                self._state = False
+        try:
+            await self.jvc_client.power_on()
+            self.stop_processing_commands.clear()
+            # save state
+            await self._state_storage.async_save(
+                {"connected": self.jvc_client.connection_open}
+            )
+        except Exception as err:  # pylint: disable=broad-except
+            _LOGGER.error("Error turning on projector: %s", err)
+            self._state = False
 
     async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
         self._state = False
 
-        async with self.lock:
-            try:
-                await self.jvc_client.power_off()
-                self.stop_processing_commands.set()
-                await self.clear_queue()
-                self.jvc_client.attributes.connection_active = False
-                # save state
-                await self._state_storage.async_save(
-                    {"connected": self.jvc_client.connection_open}
-                )
-            except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.error("Error turning off projector: %s", err)
-                self._state = False
+        try:
+            await self.jvc_client.power_off()
+            self.stop_processing_commands.set()
+            await self.clear_queue()
+            self.jvc_client.attributes.connection_active = False
+            # save state
+            await self._state_storage.async_save(
+                {"connected": self.jvc_client.connection_open}
+            )
+        except Exception as err:  # pylint: disable=broad-except
+            _LOGGER.error("Error turning off projector: %s", err)
+            self._state = False
 
     async def async_update(self):
         """Retrieve latest state."""
