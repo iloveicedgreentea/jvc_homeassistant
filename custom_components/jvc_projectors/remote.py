@@ -65,9 +65,15 @@ class JVCRemote(RemoteEntity):
         self._update_interval = async_track_time_interval(
             self.hass, self.async_update_state, datetime.timedelta(seconds=5)
         )
+        # open connection
+        conn = self.hass.loop.create_task(self.open_connection())
+        self.tasks.append(conn)
 
+        # handle commands
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
+
+        # sync phsyical state with integration state
         ping = self.hass.loop.create_task(self.ping_until_alive())
         self.tasks.append(ping)
 
@@ -85,21 +91,34 @@ class JVCRemote(RemoteEntity):
             if not task.done():
                 task.cancel()
 
+    async def open_connection(self):
+        """Open the connection to the projector."""
+        try:
+            _LOGGER.debug("Opening connection to %s", self.host)
+            res = await self.jvc_client.open_connection()
+            if res:
+                _LOGGER.debug("Connection to %s opened", self.host)
+                return True
+        except asyncio.CancelledError as err:
+            return
+        # intentionally broad
+        except TypeError as err:
+            # this is benign, just means the PJ is not connected yet
+            _LOGGER.debug("benign error with ping: %s", err)
+        except Exception as err:
+            _LOGGER.error("some error happened with ping: %s", err)
+
     async def ping_until_alive(self) -> None:
-        """ping unit until its alive if previously connected. Once True, call open_connection. Used when HA was restarted while PJ was on"""
+        """Continuously check if the PJ is on to sync integration state with physical state."""
 
-        # if not self._previously_connected:
-        #     _LOGGER.debug(
-        #         "Projector was not previously connected, skipping reconnection."
-        #     )
-        #     return
-        # TODO: attempt to send a power command to see if its physically on instead of doing state storage
-        # TODO: ping  only to see if its available, not to turn it on
-        # cmd = f"ping -c 1 -W 2 {self.host}"
         sleep_interval = 5
-
+        
         while True:
             try:
+                # wait for connection to be open
+                if not self.jvc_client.connection_open:
+                    await asyncio.sleep(2)
+                    continue
                 _LOGGER.debug("Pinging %s", self.host)
                 on = await self.jvc_client.is_on()
                 if on:
@@ -117,7 +136,6 @@ class JVCRemote(RemoteEntity):
                 continue
 
             except asyncio.CancelledError as err:
-                _LOGGER.error(err)
                 return
             # intentionally broad
             except TypeError as err:
@@ -133,46 +151,49 @@ class JVCRemote(RemoteEntity):
         Handle items in command queue.
         This is run in an event loop
         """
-        while True:
-            # send all commands in queue
-            while (
-                # if the queue is not empty and we are not stopping
-                not self.command_queue.empty()
-                and not self.stop_processing_commands.is_set()
-                and not self.jvc_client.writer is None
-                and self.jvc_client.connection_open is True
-            ):
-                # can be a command or a tuple[function, attribute]
-                command: (
-                    Iterable[str] | tuple[Callable[[], str | int | bool | float], str]
-                ) = await self.command_queue.get()
-                _LOGGER.debug("got queue item %s", command)
-                # if its a tuple its an attribute update
-                if isinstance(command, tuple):
-                    getter, attribute = command
-                    _LOGGER.debug(
-                        "trying attribute %s with getter %s", attribute, getter
-                    )
-                    value = await getter()
-                    _LOGGER.debug("got value %s for attribute %s", value, attribute)
-                    setattr(self.jvc_client.attributes, attribute, value)
-                else:
-                    # run the command and set type to operation
-                    # HA sends commands like ["power, on"] which is one item
-                    await self.jvc_client.exec_command(command, Header.operation.value)
+        try:
+            while True:
+                # send all commands in queue
+                while (
+                    # if the queue is not empty and we are not stopping
+                    not self.command_queue.empty()
+                    and not self.stop_processing_commands.is_set()
+                    and not self.jvc_client.writer is None
+                    and self.jvc_client.connection_open is True
+                ):
+                    # can be a command or a tuple[function, attribute]
+                    command: (
+                        Iterable[str] | tuple[Callable[[], str | int | bool | float], str]
+                    ) = await self.command_queue.get()
+                    _LOGGER.debug("got queue item %s", command)
+                    # if its a tuple its an attribute update
+                    if isinstance(command, tuple):
+                        getter, attribute = command
+                        _LOGGER.debug(
+                            "trying attribute %s with getter %s", attribute, getter
+                        )
+                        value = await getter()
+                        _LOGGER.debug("got value %s for attribute %s", value, attribute)
+                        setattr(self.jvc_client.attributes, attribute, value)
+                    else:
+                        # run the command and set type to operation
+                        # HA sends commands like ["power, on"] which is one item
+                        await self.jvc_client.exec_command(command, Header.operation.value)
+                    await asyncio.sleep(0.1)
+                # if we are stopping and the queue is not empty, clear it
+                # this is so it doesnt continuously print the stopped processing commands message
+                if (
+                    self.stop_processing_commands.is_set()
+                    and not self.command_queue.empty()
+                ):
+                    await self.clear_queue()
+                    _LOGGER.debug("Stopped processing commands")
+                    # break to the outer loop so it can restart itself if needed
+                    break
+                # save cpu
                 await asyncio.sleep(0.1)
-            # if we are stopping and the queue is not empty, clear it
-            # this is so it doesnt continuously print the stopped processing commands message
-            if (
-                self.stop_processing_commands.is_set()
-                and not self.command_queue.empty()
-            ):
-                await self.clear_queue()
-                _LOGGER.debug("Stopped processing commands")
-                # break to the outer loop so it can restart itself if needed
-                break
-            # save cpu
-            await asyncio.sleep(0.1)
+        except asyncio.CancelledError as err:
+            return
 
     async def clear_queue(self):
         """Clear the queue"""
