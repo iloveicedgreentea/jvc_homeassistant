@@ -4,13 +4,11 @@ from collections.abc import Iterable
 import logging
 import asyncio
 from dataclasses import asdict
-import traceback
 from typing import Callable
 
 from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator, Header
 
-from .const import DOMAIN, PLATFORM_SCHEMA
-from homeassistant.helpers.storage import Store
+from .const import DOMAIN
 
 from homeassistant.components.remote import RemoteEntity
 from homeassistant.const import (
@@ -22,8 +20,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
-STATE_STORAGE_KEY = "jvc_projector_entity_state"
-STATE_STORAGE_VERSION = 1
 
 
 class JVCRemote(RemoteEntity):
@@ -60,16 +56,9 @@ class JVCRemote(RemoteEntity):
 
         self.hass = hass
 
-        # state storage
-        self._state_storage = Store(self.hass, STATE_STORAGE_VERSION, STATE_STORAGE_KEY)
-
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
         # add the queue handler to the event loop
-
-        # load previous state used to determine to reconnect if HA was restarted AND powered on because it always responds to ping
-        # state = await self._state_storage.async_load()
-        # self._previously_connected = state.get("connected", False) if state else False
 
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
@@ -95,29 +84,21 @@ class JVCRemote(RemoteEntity):
         #     return
         # TODO: attempt to send a power command to see if its physically on instead of doing state storage
         # TODO: ping  only to see if its available, not to turn it on
-        cmd = f"ping -c 1 -W 2 {self.host}"
+        # cmd = f"ping -c 1 -W 2 {self.host}"
         sleep_interval = 5
 
         while True:
             try:
-                _LOGGER.debug("Pinging with cmd %s", cmd)
-                process = await asyncio.create_subprocess_shell(
-                    cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-                )
+                _LOGGER.debug("Pinging %s", self.host)
+                on = await self.jvc_client.is_on()
+                if on:
+                    _LOGGER.debug("PJ is on - turning on integration")
+                    await self.async_turn_on()
+                    return
 
-                await process.communicate()
-
-                # if ping works, turn it on and exit
-                if process.returncode == 0:
-                    # TODO: if its physically on, use is_on() to check if its on, then set the state
-                    _LOGGER.debug("ping success, turning on")
-                    await asyncio.sleep(2)
-                    result = await self.jvc_client.open_connection()
-                    _LOGGER.debug("open connection result: %s", result)
-                    if not result:
-                        _LOGGER.error("Could not open connection: %s", result)
-                    self._state = True
-
+                if not on and self._state:
+                    _LOGGER.debug("PJ is off - turning off integration")
+                    await self.async_turn_off()
                     return
 
                 # wait and continue
@@ -125,14 +106,12 @@ class JVCRemote(RemoteEntity):
                 continue
 
             except asyncio.CancelledError as err:
-                process.terminate()
-                await process.wait()
                 _LOGGER.error(err)
                 return
             # intentionally broad
             except Exception as err:
                 _LOGGER.error("some error happened with ping: %s", err)
-                return
+                continue
 
     async def handle_queue(self):
         """
@@ -248,21 +227,20 @@ class JVCRemote(RemoteEntity):
 
     async def async_turn_on(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power on command."""
+
         self._state = True
-        # TODO: does this need to be sent to queue
+
         try:
             await self.jvc_client.power_on()
             self.stop_processing_commands.clear()
             # save state
-            await self._state_storage.async_save(
-                {"connected": self.jvc_client.connection_open}
-            )
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning on projector: %s", err)
             self._state = False
 
     async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
+
         self._state = False
 
         try:
@@ -271,9 +249,6 @@ class JVCRemote(RemoteEntity):
             await self.clear_queue()
             self.jvc_client.attributes.connection_active = False
             # save state
-            await self._state_storage.async_save(
-                {"connected": self.jvc_client.connection_open}
-            )
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning off projector: %s", err)
             self._state = False
