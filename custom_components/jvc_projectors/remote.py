@@ -5,8 +5,10 @@ import logging
 import asyncio
 from dataclasses import asdict
 from typing import Callable
+import datetime
 
 from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator, Header
+from homeassistant.helpers.event import async_track_time_interval
 
 from .const import DOMAIN
 
@@ -59,6 +61,10 @@ class JVCRemote(RemoteEntity):
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
         # add the queue handler to the event loop
+        # get updates in a set interval
+        self._update_interval = async_track_time_interval(
+            self.hass, self.async_update_state, datetime.timedelta(seconds=5)
+        )
 
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
@@ -68,6 +74,11 @@ class JVCRemote(RemoteEntity):
     async def async_will_remove_from_hass(self) -> None:
         """close the connection and cancel all tasks when the entity is removed"""
         # close connection
+        # stop scheduled updates
+        if self._update_interval:
+            self._update_interval()
+            self._update_interval = None
+
         await self.jvc_client.close_connection()
         # cancel all tasks
         for task in self.tasks:
@@ -109,6 +120,10 @@ class JVCRemote(RemoteEntity):
                 _LOGGER.error(err)
                 return
             # intentionally broad
+            except TypeError as err:
+                # this is benign, just means the PJ is not connected yet
+                _LOGGER.debug("benign error with ping: %s", err)
+                continue
             except Exception as err:
                 _LOGGER.error("some error happened with ping: %s", err)
                 continue
@@ -189,7 +204,7 @@ class JVCRemote(RemoteEntity):
     @property
     def should_poll(self):
         """Poll."""
-        return True
+        return False
 
     @property
     def name(self):
@@ -253,7 +268,7 @@ class JVCRemote(RemoteEntity):
             _LOGGER.error("Error turning off projector: %s", err)
             self._state = False
 
-    async def async_update(self):
+    async def async_update_state(self, now):
         """Retrieve latest state."""
         if (
             not self.stop_processing_commands.is_set()
@@ -370,6 +385,7 @@ class JVCRemote(RemoteEntity):
             # set the model and power
             self.jvc_client.attributes.model = self.jvc_client.model_family
             self.jvc_client.attributes.power_state = self._state
+            self.async_write_ha_state()
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
