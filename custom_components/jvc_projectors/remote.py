@@ -21,6 +21,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(funcName)s - Line: %(lineno)d",
+)
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -57,6 +61,7 @@ class JVCRemote(RemoteEntity):
         self.lock = jvc_client.lock
 
         self.hass = hass
+        self._update_interval = None
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
@@ -93,49 +98,56 @@ class JVCRemote(RemoteEntity):
 
     async def open_connection(self):
         """Open the connection to the projector."""
+        _LOGGER.debug("About to open connection with jvc_client: %s", self.jvc_client)
         try:
             _LOGGER.debug("Opening connection to %s", self.host)
             res = await self.jvc_client.open_connection()
             if res:
                 _LOGGER.debug("Connection to %s opened", self.host)
                 return True
-        except asyncio.CancelledError as err:
+        except asyncio.CancelledError:
             return
         # intentionally broad
         except TypeError as err:
             # this is benign, just means the PJ is not connected yet
-            _LOGGER.debug("benign error with ping: %s", err)
+            _LOGGER.debug("open_connection: %s", err)
+            return
         except Exception as err:
-            _LOGGER.error("some error happened with ping: %s", err)
+            _LOGGER.error("some error happened with open_connection: %s", err)
 
     async def ping_until_alive(self) -> None:
         """Continuously check if the PJ is on to sync integration state with physical state."""
 
         sleep_interval = 5
-        
+
         while True:
+            if self.jvc_client is None:
+                _LOGGER.debug("JVC client is None, waiting")
+                await asyncio.sleep(2)
+                continue
             try:
                 # wait for connection to be open
                 if not self.jvc_client.connection_open:
+                    _LOGGER.debug("Connection not open yet, waiting")
                     await asyncio.sleep(2)
                     continue
                 _LOGGER.debug("Pinging %s", self.host)
                 on = await self.jvc_client.is_on()
-                if on:
+                if on and not self._state:
                     _LOGGER.debug("PJ is on - turning on integration")
-                    await self.async_turn_on()
-                    return
+                    self._state = True
+                    self.async_write_ha_state()
 
                 if not on and self._state:
                     _LOGGER.debug("PJ is off - turning off integration")
-                    await self.async_turn_off()
-                    return
+                    self._state = False
+                    self.async_write_ha_state()
 
                 # wait and continue
                 await asyncio.sleep(sleep_interval)
                 continue
 
-            except asyncio.CancelledError as err:
+            except asyncio.CancelledError:
                 return
             # intentionally broad
             except TypeError as err:
@@ -158,12 +170,13 @@ class JVCRemote(RemoteEntity):
                     # if the queue is not empty and we are not stopping
                     not self.command_queue.empty()
                     and not self.stop_processing_commands.is_set()
-                    and not self.jvc_client.writer is None
+                    and self.jvc_client.writer is not None
                     and self.jvc_client.connection_open is True
                 ):
                     # can be a command or a tuple[function, attribute]
                     command: (
-                        Iterable[str] | tuple[Callable[[], str | int | bool | float], str]
+                        Iterable[str]
+                        | tuple[Callable[[], str | int | bool | float], str]
                     ) = await self.command_queue.get()
                     _LOGGER.debug("got queue item %s", command)
                     # if its a tuple its an attribute update
@@ -175,10 +188,13 @@ class JVCRemote(RemoteEntity):
                         value = await getter()
                         _LOGGER.debug("got value %s for attribute %s", value, attribute)
                         setattr(self.jvc_client.attributes, attribute, value)
+                        self.async_write_ha_state()
                     else:
                         # run the command and set type to operation
                         # HA sends commands like ["power, on"] which is one item
-                        await self.jvc_client.exec_command(command, Header.operation.value)
+                        await self.jvc_client.exec_command(
+                            command, Header.operation.value
+                        )
                     await asyncio.sleep(0.1)
                 # if we are stopping and the queue is not empty, clear it
                 # this is so it doesnt continuously print the stopped processing commands message
@@ -192,7 +208,7 @@ class JVCRemote(RemoteEntity):
                     break
                 # save cpu
                 await asyncio.sleep(0.1)
-        except asyncio.CancelledError as err:
+        except asyncio.CancelledError:
             return
 
     async def clear_queue(self):
@@ -212,7 +228,7 @@ class JVCRemote(RemoteEntity):
         while True:
             if (
                 not self.stop_processing_commands.is_set()
-                and not self.jvc_client.writer is None
+                and self.jvc_client.writer is not None
                 and self.jvc_client.connection_open is True
             ):
                 # this is just an async interface so the other processor doesnt become complicated
@@ -241,7 +257,9 @@ class JVCRemote(RemoteEntity):
     def extra_state_attributes(self):
         """Return extra state attributes."""
         # Separate views for models to be cleaner
+        _LOGGER.debug(asdict(self.jvc_client.attributes))
         if self._state:
+            _LOGGER.debug("showing all attr")
             all_attr = asdict(self.jvc_client.attributes)
             # remove lamp stuff if its a laser
             if "NZ" in self.jvc_client.model_family:
@@ -273,6 +291,8 @@ class JVCRemote(RemoteEntity):
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning on projector: %s", err)
             self._state = False
+        finally:
+            await self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
@@ -288,12 +308,22 @@ class JVCRemote(RemoteEntity):
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning off projector: %s", err)
             self._state = False
+        finally:
+            await self.async_write_ha_state()
+
+    async def make_updates(self, attribute_getters: list[tuple[Callable, str]]):
+        """Add all the attribute getters to the queue."""
+        for getter, name in attribute_getters:
+            await self.attribute_queue.put((getter, name))
+
+        # get hdr attributes
+        await self.attribute_queue.join()
 
     async def async_update_state(self, now):
         """Retrieve latest state."""
         if (
             not self.stop_processing_commands.is_set()
-            and not self.jvc_client.writer is None
+            and self.jvc_client.writer is not None
             and self.jvc_client.connection_open is True
         ):
             # certain commands can only run at certain times
@@ -301,13 +331,9 @@ class JVCRemote(RemoteEntity):
             # have to add specific commands in a precise order
             # common stuff
             attribute_getters = []
-            _LOGGER.debug("updating state")
-            self.jvc_client.attributes.connection_active = (
-                self.jvc_client.writer is not None
-            )
             self._state = await self.jvc_client.is_on()
             if self._state:
-                _LOGGER.debug("getting attributes")
+                _LOGGER.debug("updating state")
                 # takes a func and an attribute to write result into
                 attribute_getters.extend(
                     [
@@ -317,7 +343,10 @@ class JVCRemote(RemoteEntity):
                     ]
                 )
                 # determine how to proceed based on above
-
+                await self.make_updates(attribute_getters)
+                _LOGGER.debug(
+                    "got signal status: %s", self.jvc_client.attributes.signal_status
+                )
                 if self.jvc_client.attributes.signal_status is True:
                     attribute_getters.extend(
                         [
@@ -331,7 +360,7 @@ class JVCRemote(RemoteEntity):
                             (self.jvc_client.get_source_display, "resolution"),
                         ]
                     )
-                if not "Unsupported" in self.jvc_client.model_family:
+                if "Unsupported" not in self.jvc_client.model_family:
                     attribute_getters.extend(
                         [
                             (self.jvc_client.get_install_mode, "installation_mode"),
@@ -362,11 +391,7 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
 
-                for getter, name in attribute_getters:
-                    await self.attribute_queue.put((getter, name))
-
-                # get hdr attributes
-                await self.attribute_queue.join()
+                await self.make_updates(attribute_getters)
 
                 # get laser value if fw is a least 3.0
                 if "NZ" in self.jvc_client.model_family:
@@ -397,23 +422,18 @@ class JVCRemote(RemoteEntity):
                     )
 
                 # get all the updates
-                for getter, name in attribute_getters:
-                    await self.attribute_queue.put((getter, name))
-
-                await self.attribute_queue.join()
+                await self.make_updates(attribute_getters)
             else:
                 _LOGGER.debug("PJ is off")
             # set the model and power
             self.jvc_client.attributes.model = self.jvc_client.model_family
             self.jvc_client.attributes.power_state = self._state
-            self.async_write_ha_state()
+            await self.async_write_ha_state()
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
         _LOGGER.debug("adding command %s to queue", command)
         await self.command_queue.put(command)
-
-    # TODO: helper function to add to queue
 
 
 async def async_setup_entry(

@@ -1,16 +1,13 @@
 """The JVC Projector integration."""
 
 from __future__ import annotations
-from jvc_projector.jvc_projector import JVCProjectorCoordinator, JVCInput
 import logging
-import asyncio
+from jvc_projector.jvc_projector import JVCProjectorCoordinator, JVCInput
 from homeassistant import config_entries
 from homeassistant.const import (
     CONF_HOST,
-    CONF_NAME,
     CONF_PASSWORD,
     CONF_TIMEOUT,
-    CONF_SCAN_INTERVAL,
     Platform,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -32,15 +29,6 @@ async def async_setup_entry(hass, entry):
     options = JVCInput(host, password, port, timeout)
     # Create a coordinator or directly set up your entities with the provided information
     coordinator = JVCProjectorCoordinator(options, _LOGGER)
-    # I dont want to open a connection unless its on because then I can't test
-    # try:
-    #     res = await coordinator.open_connection()
-    #     if not res:
-    #         _LOGGER.error("Error setting up JVC Projector during async_setup_entry")
-    #         return False
-    # except Exception as e:
-    #     _LOGGER.error("Error setting up JVC Projector during async_setup_entry - %s", e)
-    #     return False
 
     # Store the coordinator in hass.data for use by your platform (e.g., remote)
     hass.data[DOMAIN] = coordinator

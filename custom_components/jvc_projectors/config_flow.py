@@ -1,13 +1,12 @@
 import voluptuous as vol
 import logging
-from homeassistant import config_entries, core
+from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
     CONF_PASSWORD,
     CONF_TIMEOUT,
-    CONF_SCAN_INTERVAL,
 )
 import homeassistant.helpers.config_validation as cv
 from jvc_projector.jvc_projector import JVCProjectorCoordinator, JVCInput
@@ -68,7 +67,10 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("JVC Projector setup connection sucessfully closed")
                 return True
         except Exception as e:
-            _LOGGER.error("Error validating JVC Projector setup. Please check host and password: %s", e)
+            _LOGGER.error(
+                "Error validating JVC Projector setup. Please check host and password: %s",
+                e,
+            )
             return False
         return False
 
