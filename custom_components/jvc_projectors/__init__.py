@@ -25,7 +25,6 @@ async def async_setup_entry(hass, entry):
 
     timeout = entry.data.get(CONF_TIMEOUT, 3)
     port = 20554
-    _LOGGER.debug(f"Setting up JVC Projector with host: {host}")
     options = JVCInput(host, password, port, timeout)
     # Create a coordinator or directly set up your entities with the provided information
     coordinator = JVCProjectorCoordinator(options, _LOGGER)

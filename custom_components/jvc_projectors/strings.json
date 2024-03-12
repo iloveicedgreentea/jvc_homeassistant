@@ -5,10 +5,14 @@
       "user": {
         "title": "Connect to your JVC Projector",
         "data": {
-          "name": "Name",
-          "host": "Host",
-          "password": "Password",
-          "timeout": "Timeout"
+          "name": "[%key:common::config_flow::data::name%]",
+          "host": "[%key:common::config_flow::data::host%]",
+          "password": "[%key:common::config_flow::data::password%]"
+        },
+        "data_description": {
+          "name": "Name for your projector",
+          "host": "IP address or hostname of projector",
+          "password": "Optional password if NZ series or higher"
         }
       }
     },

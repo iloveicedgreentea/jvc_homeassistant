@@ -5,10 +5,8 @@ from homeassistant.core import callback
 from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
-    CONF_PASSWORD,
-    CONF_TIMEOUT,
+    CONF_PASSWORD
 )
-import homeassistant.helpers.config_validation as cv
 from jvc_projector.jvc_projector import JVCProjectorCoordinator, JVCInput
 
 from .const import DOMAIN  # Import the domain constant
@@ -28,7 +26,7 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             host = user_input.get(CONF_HOST)
             password = user_input.get(CONF_PASSWORD)
-            timeout = user_input.get(CONF_TIMEOUT, 3)
+            timeout = 5
 
             valid = await self.validate_setup(host, password, timeout)
 
@@ -45,8 +43,7 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_NAME): str,
                 vol.Required(CONF_HOST): str,
-                vol.Optional(CONF_PASSWORD): str,
-                vol.Optional(CONF_TIMEOUT, default=3): int,
+                vol.Optional(CONF_PASSWORD): str
             }
         )
 
@@ -114,10 +111,7 @@ class JVCOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(CONF_HOST, default=current_config.get(CONF_HOST)): str,
                 vol.Optional(
                     CONF_PASSWORD, default=current_config.get(CONF_PASSWORD)
-                ): str,
-                vol.Optional(
-                    CONF_TIMEOUT, default=current_config.get(CONF_TIMEOUT, 3)
-                ): int,
+                ): str
             }
         )
 
