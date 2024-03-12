@@ -58,7 +58,7 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """return True if the projector connects"""
         try:
             options = JVCInput(host, password, 20554, timeout)
-            coordinator = JVCProjectorCoordinator(options)
+            coordinator = JVCProjectorCoordinator(options, _LOGGER)
             _LOGGER.debug("Validating JVC Projector setup")
             res = await coordinator.open_connection()
             if res:
