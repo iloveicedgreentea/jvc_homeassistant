@@ -72,7 +72,7 @@ class JVCRemote(RemoteEntity):
             self.hass, self.async_update_state, datetime.timedelta(seconds=5)
         )
         # open connection
-        conn = self.hass.loop.create_task(self.open_connection())
+        conn = self.hass.loop.create_task(self.open_conn())
         self.tasks.append(conn)
 
         # handle commands
@@ -82,8 +82,8 @@ class JVCRemote(RemoteEntity):
         # TODO: this is causing a hang likely a deadlock with open_connection()
         # TODO: check with debug enabled where the library logs get huung
         # handle updates
-        # update_handler = self.hass.loop.create_task(self.update_worker())
-        # self.tasks.append(update_handler)
+        update_handler = self.hass.loop.create_task(self.update_worker())
+        self.tasks.append(update_handler)
 
         # sync phsyical state with integration state
         ping = self.hass.loop.create_task(self.ping_until_alive())
@@ -103,7 +103,7 @@ class JVCRemote(RemoteEntity):
             if not task.done():
                 task.cancel()
 
-    async def open_connection(self):
+    async def open_conn(self):
         """Open the connection to the projector."""
         _LOGGER.debug("About to open connection with jvc_client: %s", self.jvc_client)
         try:
@@ -257,11 +257,17 @@ class JVCRemote(RemoteEntity):
                 # this is just an async interface so the other processor doesnt become complicated
 
                 # getter will be a Callable
-                getter, attribute = await self.attribute_queue.get()
+                try:
+                    _LOGGER.debug("getting from queue")
+                    getter, attribute = await asyncio.wait_for(self.attribute_queue.get(), timeout=1)
+                    _LOGGER.debug("got getter %s and attribute %s", getter, attribute)
                 # add to the command queue with a single interface
-                await self.command_queue.put((getter, attribute))
+                    _LOGGER.debug("adding getter %s and attribute %s to command queue", getter, attribute)
+                    await asyncio.wait_for(self.command_queue.put((getter, attribute)), timeout=2)
+                except asyncio.TimeoutError:
+                    pass
                 _LOGGER.debug("added getter %s and attribute %s", getter, attribute)
-                await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
 
     @property
     def should_poll(self):
