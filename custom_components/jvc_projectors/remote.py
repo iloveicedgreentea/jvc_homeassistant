@@ -48,6 +48,7 @@ class JVCRemote(RemoteEntity):
         self._attr_unique_id = entry.entry_id
 
         self.jvc_client = jvc_client
+        self.jvc_client.logger = _LOGGER
         # attributes
         self._state = False
 
@@ -77,10 +78,12 @@ class JVCRemote(RemoteEntity):
         # handle commands
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
-        
+
+        # TODO: this is causing a hang likely a deadlock with open_connection()
+        # TODO: check with debug enabled where the library logs get huung
         # handle updates
-        update_handler = self.hass.loop.create_task(self.update_worker())
-        self.tasks.append(update_handler)
+        # update_handler = self.hass.loop.create_task(self.update_worker())
+        # self.tasks.append(update_handler)
 
         # sync phsyical state with integration state
         ping = self.hass.loop.create_task(self.ping_until_alive())
@@ -105,10 +108,12 @@ class JVCRemote(RemoteEntity):
         _LOGGER.debug("About to open connection with jvc_client: %s", self.jvc_client)
         try:
             _LOGGER.debug("Opening connection to %s", self.host)
-            res = await self.jvc_client.open_connection()
+            res = await asyncio.wait_for(self.jvc_client.open_connection(), timeout=3)
             if res:
                 _LOGGER.debug("Connection to %s opened", self.host)
                 return True
+        except asyncio.TimeoutError:
+            _LOGGER.warning("Timeout while trying to connect to %s", self._host)
         except asyncio.CancelledError:
             return
         # intentionally broad
@@ -118,6 +123,7 @@ class JVCRemote(RemoteEntity):
             return
         except Exception as err:
             _LOGGER.error("some error happened with open_connection: %s", err)
+        await asyncio.sleep(5)
 
     async def ping_until_alive(self) -> None:
         """Continuously check if the PJ is on to sync integration state with physical state."""
@@ -135,7 +141,7 @@ class JVCRemote(RemoteEntity):
                     _LOGGER.debug("Connection not open yet, waiting")
                     await asyncio.sleep(2)
                     continue
-                on = await self.jvc_client.is_on()
+                on = await asyncio.wait_for(self.jvc_client.is_on(), timeout=3)
                 if on and not self._state:
                     _LOGGER.debug("PJ is on - turning on integration")
                     self._state = True
@@ -149,7 +155,8 @@ class JVCRemote(RemoteEntity):
                 # wait and continue
                 await asyncio.sleep(sleep_interval)
                 continue
-
+            except asyncio.TimeoutError:
+                _LOGGER.debug("Timeout during ping to %s", self._host)
             except asyncio.CancelledError:
                 return
             # intentionally broad
@@ -160,6 +167,7 @@ class JVCRemote(RemoteEntity):
             except Exception as err:
                 _LOGGER.error("some error happened with ping: %s", err)
                 continue
+            await asyncio.sleep(5)
 
     async def handle_queue(self):
         """
@@ -188,16 +196,28 @@ class JVCRemote(RemoteEntity):
                         _LOGGER.debug(
                             "trying attribute %s with getter %s", attribute, getter
                         )
-                        value = await getter()
+                        try:
+                            value = await asyncio.wait_for(getter(), timeout=3)
+                        except asyncio.TimeoutError:
+                            _LOGGER.debug("Timeout getting attribute %s", attribute)
+                            continue
                         _LOGGER.debug("got value %s for attribute %s", value, attribute)
                         setattr(self.jvc_client.attributes, attribute, value)
                         self.async_write_ha_state()
                     else:
                         # run the command and set type to operation
                         # HA sends commands like ["power, on"] which is one item
-                        await self.jvc_client.exec_command(
-                            command, Header.operation.value
-                        )
+                        try:
+                            await asyncio.wait_for(
+                                self.jvc_client.exec_command(
+                                    command, Header.operation.value
+                                ),
+                                timeout=3,
+                            )
+                        except asyncio.TimeoutError:
+                            _LOGGER.debug("Timeout sending command %s", command)
+                            continue
+
                     await asyncio.sleep(0.1)
                 # if we are stopping and the queue is not empty, clear it
                 # this is so it doesnt continuously print the stopped processing commands message
