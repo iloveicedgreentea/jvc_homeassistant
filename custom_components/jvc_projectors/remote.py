@@ -241,6 +241,7 @@ class JVCRemote(RemoteEntity):
                 # add to the command queue with a single interface
                 await self.command_queue.put((getter, attribute))
                 _LOGGER.debug("added getter %s and attribute %s", getter, attribute)
+                await asyncio.sleep(0.1)
 
     @property
     def should_poll(self):
