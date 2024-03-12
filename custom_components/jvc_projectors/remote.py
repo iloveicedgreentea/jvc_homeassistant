@@ -77,6 +77,10 @@ class JVCRemote(RemoteEntity):
         # handle commands
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
+        
+        # handle updates
+        update_handler = self.hass.loop.create_task(self.update_worker())
+        self.tasks.append(update_handler)
 
         # sync phsyical state with integration state
         ping = self.hass.loop.create_task(self.ping_until_alive())
@@ -118,7 +122,7 @@ class JVCRemote(RemoteEntity):
     async def ping_until_alive(self) -> None:
         """Continuously check if the PJ is on to sync integration state with physical state."""
 
-        sleep_interval = 5
+        sleep_interval = 10
 
         while True:
             if self.jvc_client is None:
@@ -131,7 +135,6 @@ class JVCRemote(RemoteEntity):
                     _LOGGER.debug("Connection not open yet, waiting")
                     await asyncio.sleep(2)
                     continue
-                _LOGGER.debug("Pinging %s", self.host)
                 on = await self.jvc_client.is_on()
                 if on and not self._state:
                     _LOGGER.debug("PJ is on - turning on integration")
@@ -237,6 +240,7 @@ class JVCRemote(RemoteEntity):
                 getter, attribute = await self.attribute_queue.get()
                 # add to the command queue with a single interface
                 await self.command_queue.put((getter, attribute))
+                _LOGGER.debug("added getter %s and attribute %s", getter, attribute)
 
     @property
     def should_poll(self):
@@ -292,7 +296,7 @@ class JVCRemote(RemoteEntity):
             _LOGGER.error("Error turning on projector: %s", err)
             self._state = False
         finally:
-            await self.async_write_ha_state()
+            self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
@@ -309,7 +313,7 @@ class JVCRemote(RemoteEntity):
             _LOGGER.error("Error turning off projector: %s", err)
             self._state = False
         finally:
-            await self.async_write_ha_state()
+            self.async_write_ha_state()
 
     async def make_updates(self, attribute_getters: list[tuple[Callable, str]]):
         """Add all the attribute getters to the queue."""
@@ -428,7 +432,7 @@ class JVCRemote(RemoteEntity):
             # set the model and power
             self.jvc_client.attributes.model = self.jvc_client.model_family
             self.jvc_client.attributes.power_state = self._state
-            await self.async_write_ha_state()
+            self.async_write_ha_state()
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
