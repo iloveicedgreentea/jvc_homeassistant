@@ -72,20 +72,22 @@ class JVCRemote(RemoteEntity):
             self.hass, self.async_update_state, datetime.timedelta(seconds=5)
         )
         # open connection
+        _LOGGER.debug("adding conection to loop")
         conn = self.hass.loop.create_task(self.open_conn())
         self.tasks.append(conn)
 
         # handle commands
+        _LOGGER.debug("adding queue handler to loop")
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
 
-        # TODO: this is causing a hang likely a deadlock with open_connection()
-        # TODO: check with debug enabled where the library logs get huung
         # handle updates
+        _LOGGER.debug("adding update handler to loop")
         update_handler = self.hass.loop.create_task(self.update_worker())
         self.tasks.append(update_handler)
 
         # sync phsyical state with integration state
+        _LOGGER.debug("adding ping handler to loop")
         ping = self.hass.loop.create_task(self.ping_until_alive())
         self.tasks.append(ping)
 
@@ -217,7 +219,8 @@ class JVCRemote(RemoteEntity):
                         except asyncio.TimeoutError:
                             _LOGGER.debug("Timeout sending command %s", command)
                             continue
-
+                    # mark as done
+                    self.command_queue.task_done()
                     await asyncio.sleep(0.1)
                 # if we are stopping and the queue is not empty, clear it
                 # this is so it doesnt continuously print the stopped processing commands message
@@ -249,24 +252,29 @@ class JVCRemote(RemoteEntity):
     async def update_worker(self):
         """Gets a function and attribute from a queue and adds it to the command interface"""
         while True:
-            if (
-                not self.stop_processing_commands.is_set()
-                and self.jvc_client.writer is not None
-                and self.jvc_client.connection_open is True
-            ):
-                # this is just an async interface so the other processor doesnt become complicated
+            # this is just an async interface so the other processor doesnt become complicated
 
-                # getter will be a Callable
-                try:
-                    _LOGGER.debug("getting from queue")
-                    getter, attribute = await asyncio.wait_for(self.attribute_queue.get(), timeout=1)
-                    _LOGGER.debug("got getter %s and attribute %s", getter, attribute)
+            # getter will be a Callable
+            try:
+                _LOGGER.debug("getting from queue")
+                getter, attribute = await asyncio.wait_for(
+                    self.attribute_queue.get(), timeout=1
+                )
+                _LOGGER.debug("got getter %s and attribute %s", getter, attribute)
                 # add to the command queue with a single interface
-                    _LOGGER.debug("adding getter %s and attribute %s to command queue", getter, attribute)
-                    await asyncio.wait_for(self.command_queue.put((getter, attribute)), timeout=2)
-                except asyncio.TimeoutError:
-                    pass
+                _LOGGER.debug(
+                    "adding getter %s and attribute %s to command queue",
+                    getter,
+                    attribute,
+                )
+                await asyncio.wait_for(
+                    self.command_queue.put((getter, attribute)), timeout=2
+                )
+                self.attribute_queue.task_done()
                 _LOGGER.debug("added getter %s and attribute %s", getter, attribute)
+            except asyncio.TimeoutError:
+                _LOGGER.debug("Timeout getting from attr queue")
+
             await asyncio.sleep(0.1)
 
     @property
@@ -344,25 +352,26 @@ class JVCRemote(RemoteEntity):
 
     async def make_updates(self, attribute_getters: list[tuple[Callable, str]]):
         """Add all the attribute getters to the queue."""
+        _LOGGER.debug("adding %s to queue", attribute_getters)
         for getter, name in attribute_getters:
             await self.attribute_queue.put((getter, name))
 
         # get hdr attributes
         await self.attribute_queue.join()
+        # extra sleep to make sure all the updates are done
+        await asyncio.sleep(0.5)
 
     async def async_update_state(self, now):
         """Retrieve latest state."""
-        if (
-            not self.stop_processing_commands.is_set()
-            and self.jvc_client.writer is not None
-            and self.jvc_client.connection_open is True
-        ):
+        if self.jvc_client.connection_open is True:
             # certain commands can only run at certain times
             # if they fail (i.e grayed out on menu) JVC will simply time out. Bad UX
             # have to add specific commands in a precise order
             # common stuff
             attribute_getters = []
             self._state = await self.jvc_client.is_on()
+            _LOGGER.debug("PJ _state is : %s", self._state)
+            self.jvc_client.attributes.power_state = self._state
             if self._state:
                 _LOGGER.debug("updating state")
                 # takes a func and an attribute to write result into
@@ -379,6 +388,7 @@ class JVCRemote(RemoteEntity):
                     "got signal status: %s", self.jvc_client.attributes.signal_status
                 )
                 if self.jvc_client.attributes.signal_status is True:
+                    _LOGGER.debug("PJ has signal")
                     attribute_getters.extend(
                         [
                             (self.jvc_client.get_content_type, "content_type"),
@@ -426,12 +436,15 @@ class JVCRemote(RemoteEntity):
 
                 # get laser value if fw is a least 3.0
                 if "NZ" in self.jvc_client.model_family:
-                    if float(self.jvc_client.attributes.software_version) >= 3.00:
-                        attribute_getters.extend(
-                            [
-                                (self.jvc_client.get_laser_value, "laser_value"),
-                            ]
-                        )
+                    try:
+                        if float(self.jvc_client.attributes.software_version) >= 3.00:
+                            attribute_getters.extend(
+                                [
+                                    (self.jvc_client.get_laser_value, "laser_value"),
+                                ]
+                            )
+                    except ValueError:
+                        pass
                 # HDR stuff
                 if any(
                     x in self.jvc_client.attributes.content_type_trans
@@ -458,7 +471,11 @@ class JVCRemote(RemoteEntity):
                 _LOGGER.debug("PJ is off")
             # set the model and power
             self.jvc_client.attributes.model = self.jvc_client.model_family
-            self.jvc_client.attributes.power_state = self._state
+            _LOGGER.debug(
+                "JVC client model family %s and attributes is %s",
+                self.jvc_client.model_family,
+                self.jvc_client.attributes.model,
+            )
             self.async_write_ha_state()
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
