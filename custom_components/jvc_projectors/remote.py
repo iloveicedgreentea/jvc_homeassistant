@@ -2,6 +2,8 @@
 
 from collections.abc import Iterable
 import logging
+import time
+import random
 import asyncio
 from dataclasses import asdict
 from typing import Callable
@@ -59,7 +61,6 @@ class JVCRemote(RemoteEntity):
         self.attribute_queue = asyncio.Queue()
 
         self.stop_processing_commands = asyncio.Event()
-        self.lock = jvc_client.lock
 
         self.hass = hass
         self._update_interval = None
@@ -85,11 +86,6 @@ class JVCRemote(RemoteEntity):
         # _LOGGER.debug("adding update handler to loop")
         # update_handler = self.hass.loop.create_task(self.update_worker())
         # self.tasks.append(update_handler)
-
-        # sync phsyical state with integration state
-        # _LOGGER.debug("adding ping handler to loop")
-        # ping = self.hass.loop.create_task(self.ping_until_alive())
-        # self.tasks.append(ping)
 
     async def async_will_remove_from_hass(self) -> None:
         """close the connection and cancel all tasks when the entity is removed"""
@@ -127,49 +123,13 @@ class JVCRemote(RemoteEntity):
             _LOGGER.error("some error happened with open_connection: %s", err)
         await asyncio.sleep(5)
 
-    # async def ping_until_alive(self) -> None:
-    #     """Continuously check if the PJ is on to sync integration state with physical state."""
-
-    #     sleep_interval = 10
-
-    #     while True:
-    #         if self.jvc_client is None:
-    #             _LOGGER.debug("JVC client is None, waiting")
-    #             await asyncio.sleep(2)
-    #             continue
-    #         try:
-    #             # wait for connection to be open
-    #             if not self.jvc_client.connection_open:
-    #                 _LOGGER.debug("Connection not open yet, waiting")
-    #                 await asyncio.sleep(2)
-    #                 continue
-    #             on = await asyncio.wait_for(self.jvc_client.is_on(), timeout=3)
-    #             if on and not self._state:
-    #                 _LOGGER.debug("PJ is on - turning on integration")
-    #                 self._state = True
-    #                 self.async_write_ha_state()
-
-    #             if not on and self._state:
-    #                 _LOGGER.debug("PJ is off - turning off integration")
-    #                 self._state = False
-    #                 self.async_write_ha_state()
-
-    #             # wait and continue
-    #             await asyncio.sleep(sleep_interval)
-    #             continue
-    #         except asyncio.TimeoutError:
-    #             _LOGGER.debug("Timeout during ping to %s", self._host)
-    #         except asyncio.CancelledError:
-    #             return
-    #         # intentionally broad
-    #         except TypeError as err:
-    #             # this is benign, just means the PJ is not connected yet
-    #             _LOGGER.debug("benign error with ping: %s", err)
-    #             continue
-    #         except Exception as err:
-    #             _LOGGER.error("some error happened with ping: %s", err)
-    #             continue
-    #         await asyncio.sleep(5)
+    async def generate_unique_id(self) -> str:
+        timestamp = int(
+            time.time() * 1000
+        )  # Convert to milliseconds for more granularity
+        random_value = random.randint(0, 999)  # Add a random value for uniqueness
+        unique_id = f"{timestamp}-{random_value}"
+        return unique_id
 
     async def handle_queue(self):
         """
@@ -183,12 +143,11 @@ class JVCRemote(RemoteEntity):
                 # can be a command or a tuple[function, attribute]
                 # first item is the priority
                 priority, command = await self.command_queue.get()
-                _LOGGER.debug(
-                    "got queue item %s with priority %s", command, priority
-                )
+                _LOGGER.debug("got queue item %s with priority %s", command, priority)
                 # if its a tuple its an attribute update
                 if isinstance(command, tuple) and self.jvc_client.connection_open:
-                    getter, attribute = command
+                    # discard the unique ID
+                    _, getter, attribute = command
                     _LOGGER.debug(
                         "trying attribute %s with getter %s", attribute, getter
                     )
@@ -196,7 +155,10 @@ class JVCRemote(RemoteEntity):
                         value = await asyncio.wait_for(getter(), timeout=3)
                     except asyncio.TimeoutError:
                         _LOGGER.debug("Timeout with command %s", command)
-                        self.command_queue.task_done()
+                        try:
+                            self.command_queue.task_done()
+                        except ValueError:
+                            pass
                         continue
                     _LOGGER.debug("got value %s for attribute %s", value, attribute)
                     setattr(self.jvc_client.attributes, attribute, value)
@@ -214,14 +176,20 @@ class JVCRemote(RemoteEntity):
                         )
                     except asyncio.TimeoutError:
                         _LOGGER.debug("Timeout with command %s", command)
-                        self.command_queue.task_done()
+                        try:
+                            self.command_queue.task_done()
+                        except ValueError:
+                            pass
                         continue
                 # except Exception as e:
                 #     _LOGGER.error("Unexpected error in handle_queue: %s", e)
-                self.command_queue.task_done()
+                try:
+                    self.command_queue.task_done()
+                except ValueError:
+                    pass
                 await asyncio.sleep(0.1)
-            # if we are stopping and the queue is not empty, clear it
-            # this is so it doesnt continuously print the stopped processing commands message
+                # if we are stopping and the queue is not empty, clear it
+                # this is so it doesnt continuously print the stopped processing commands message
                 if (
                     self.stop_processing_commands.is_set()
                     and not self.command_queue.empty()
@@ -238,16 +206,19 @@ class JVCRemote(RemoteEntity):
 
     async def clear_queue(self):
         """Clear the queue"""
+        try:
+            # clear the queue
+            while not self.command_queue.empty():
+                self.command_queue.get_nowait()
+                self.command_queue.task_done()
 
-        # clear the queue
-        while not self.command_queue.empty():
-            self.command_queue.get_nowait()
-            self.command_queue.task_done()
+            while not self.attribute_queue.empty():
+                self.attribute_queue.get_nowait()
+                self.attribute_queue.task_done()
+        except ValueError:
+            pass
 
-        while not self.attribute_queue.empty():
-            self.attribute_queue.get_nowait()
-            self.attribute_queue.task_done()
-
+    # TODO: maybe the library is deadlocking it only locks when updates and commands are enabled together
     async def update_worker(self):
         """Gets a function and attribute from a queue and adds it to the command interface"""
         while True:
@@ -255,17 +226,16 @@ class JVCRemote(RemoteEntity):
 
             # getter will be a Callable
             try:
-                getter, attribute = await asyncio.wait_for(
-                    self.attribute_queue.get(), timeout=2
-                )
+                unique_id, getter, attribute = await self.attribute_queue.get()
                 # add to the command queue with a single interface
-                await asyncio.wait_for(
-                    self.command_queue.put((1, (getter, attribute))), timeout=2
-                )
+                await self.command_queue.put((1, (unique_id, getter, attribute)))
                 _LOGGER.debug("added %s to command queue from attribute q", attribute)
-                self.attribute_queue.task_done()
+                try:
+                    self.attribute_queue.task_done()
+                except ValueError:
+                    pass
             except asyncio.TimeoutError:
-                pass
+                _LOGGER.debug("Timeout in update_worker")
             except asyncio.CancelledError:
                 _LOGGER.debug("update_worker cancelled")
                 return
@@ -345,7 +315,13 @@ class JVCRemote(RemoteEntity):
     async def make_updates(self, attribute_getters: list[tuple[Callable, str]]):
         """Add all the attribute getters to the queue."""
         for getter, name in attribute_getters:
-            await self.attribute_queue.put((getter, name))
+            # you might be thinking why is this here?
+            # oh boy let me tell you
+            # TLDR priority queues need a unique ID to sort and you need to just dump one in
+            # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out 
+            # why this funciong deadlocks for no reason
+            unique_id = await self.generate_unique_id()
+            await self.attribute_queue.put((unique_id, getter, name))
 
         # get hdr attributes
         await self.attribute_queue.join()
@@ -475,7 +451,8 @@ class JVCRemote(RemoteEntity):
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
         _LOGGER.debug("adding command %s to queue", command)
-        await self.command_queue.put((0, command))
+        # add timestamp to preserve cmd order
+        await self.command_queue.put((0, (time.time(), command)))
         _LOGGER.debug("command %s added to queue", command)
 
 
