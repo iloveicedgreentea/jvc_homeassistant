@@ -1,15 +1,12 @@
 import voluptuous as vol
 import logging
-from homeassistant import config_entries, core
+from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
-    CONF_PASSWORD,
-    CONF_TIMEOUT,
-    CONF_SCAN_INTERVAL,
+    CONF_PASSWORD
 )
-import homeassistant.helpers.config_validation as cv
 from jvc_projector.jvc_projector import JVCProjectorCoordinator, JVCInput
 
 from .const import DOMAIN  # Import the domain constant
@@ -29,7 +26,7 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             host = user_input.get(CONF_HOST)
             password = user_input.get(CONF_PASSWORD)
-            timeout = user_input.get(CONF_TIMEOUT, 3)
+            timeout = 5
 
             valid = await self.validate_setup(host, password, timeout)
 
@@ -46,8 +43,7 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_NAME): str,
                 vol.Required(CONF_HOST): str,
-                vol.Optional(CONF_PASSWORD): str,
-                vol.Optional(CONF_TIMEOUT, default=3): int,
+                vol.Optional(CONF_PASSWORD): str
             }
         )
 
@@ -59,13 +55,19 @@ class JVCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """return True if the projector connects"""
         try:
             options = JVCInput(host, password, 20554, timeout)
-            coordinator = JVCProjectorCoordinator(options)
+            coordinator = JVCProjectorCoordinator(options, _LOGGER)
+            _LOGGER.debug("Validating JVC Projector setup")
             res = await coordinator.open_connection()
             if res:
+                _LOGGER.debug("JVC Projector setup connection worked")
                 await coordinator.close_connection()
+                _LOGGER.debug("JVC Projector setup connection sucessfully closed")
                 return True
         except Exception as e:
-            _LOGGER.error("Error validating JVC Projector setup: %s", e)
+            _LOGGER.error(
+                "Error validating JVC Projector setup. Please check host and password: %s",
+                e,
+            )
             return False
         return False
 
@@ -109,10 +111,7 @@ class JVCOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(CONF_HOST, default=current_config.get(CONF_HOST)): str,
                 vol.Optional(
                     CONF_PASSWORD, default=current_config.get(CONF_PASSWORD)
-                ): str,
-                vol.Optional(
-                    CONF_TIMEOUT, default=current_config.get(CONF_TIMEOUT, 3)
-                ): int,
+                ): str
             }
         )
 

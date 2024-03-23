@@ -4,12 +4,14 @@ from collections.abc import Iterable
 import logging
 import asyncio
 from dataclasses import asdict
-import traceback
+from typing import Callable
+import datetime
+import itertools
 
-from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator
+from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator, Header
+from homeassistant.helpers.event import async_track_time_interval
 
-from .const import DOMAIN, PLATFORM_SCHEMA
-from homeassistant.helpers.storage import Store
+from .const import DOMAIN
 
 from homeassistant.components.remote import RemoteEntity
 from homeassistant.const import (
@@ -20,9 +22,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(funcName)s - Line: %(lineno)d",
+)
 _LOGGER = logging.getLogger(__name__)
-STATE_STORAGE_KEY = "jvc_projector_entity_state"
-STATE_STORAGE_VERSION = 1
 
 
 class JVCRemote(RemoteEntity):
@@ -45,92 +49,85 @@ class JVCRemote(RemoteEntity):
         self._attr_unique_id = entry.entry_id
 
         self.jvc_client = jvc_client
+        self.jvc_client.logger = _LOGGER
         # attributes
         self._state = False
 
         # async queue
         self.tasks = []
-        self.command_queue = asyncio.Queue()
-        self.dead_letter_queue = asyncio.Queue()
+        # use one queue for all commands
+        self.command_queue = asyncio.PriorityQueue()
         self.attribute_queue = asyncio.Queue()
-        self.stop_processing_commands = asyncio.Event()
-        self.lock = asyncio.Lock()
-        self.hass = hass
 
-        # state storage
-        self._state_storage = Store(self.hass, STATE_STORAGE_VERSION, STATE_STORAGE_KEY)
+        self.stop_processing_commands = asyncio.Event()
+
+        self.hass = hass
+        self._update_interval = None
+
+        # counter for unique IDs
+        self._counter = itertools.count()
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
         # add the queue handler to the event loop
+        # get updates in a set interval
+        self._update_interval = async_track_time_interval(
+            self.hass, self.async_update_state, datetime.timedelta(seconds=5)
+        )
+        # open connection
+        _LOGGER.debug("adding conection to loop")
+        conn = self.hass.loop.create_task(self.open_conn())
+        self.tasks.append(conn)
 
-        # load previous state used to determine to reconnect if HA was restarted AND powered on because it always responds to ping
-        state = await self._state_storage.async_load()
-        self._previously_connected = state.get("connected", False) if state else False
-
+        # handle commands
+        _LOGGER.debug("adding queue handler to loop")
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
-        # update background worker
-        worker_handler = self.hass.loop.create_task(self.update_worker())
-        self.tasks.append(worker_handler)
-        ping = self.hass.loop.create_task(self.ping_until_alive())
-        self.tasks.append(ping)
+
+        # handle updates
+        _LOGGER.debug("adding update handler to loop")
+        update_handler = self.hass.loop.create_task(self.update_worker())
+        self.tasks.append(update_handler)
 
     async def async_will_remove_from_hass(self) -> None:
         """close the connection and cancel all tasks when the entity is removed"""
         # close connection
+        # stop scheduled updates
+        if self._update_interval:
+            self._update_interval()
+            self._update_interval = None
+
         await self.jvc_client.close_connection()
         # cancel all tasks
         for task in self.tasks:
             if not task.done():
                 task.cancel()
 
-    async def ping_until_alive(self) -> None:
-        """ping unit until its alive if previously connected. Once True, call open_connection. Used when HA was restarted while PJ was on"""
-
-        if not self._previously_connected:
-            _LOGGER.debug(
-                "Projector was not previously connected, skipping reconnection."
-            )
+    async def open_conn(self):
+        """Open the connection to the projector."""
+        _LOGGER.debug("About to open connection with jvc_client: %s", self.jvc_client)
+        try:
+            _LOGGER.debug("Opening connection to %s", self.host)
+            res = await asyncio.wait_for(self.jvc_client.open_connection(), timeout=3)
+            if res:
+                _LOGGER.debug("Connection to %s opened", self.host)
+                return True
+        except asyncio.TimeoutError:
+            _LOGGER.warning("Timeout while trying to connect to %s", self._host)
+        except asyncio.CancelledError:
             return
-        # TODO: attempt to send a power command to see if its physically on instead of doing state storage
-        cmd = f"ping -c 1 -W 2 {self.host}"
-        sleep_interval = 5
+        # intentionally broad
+        except TypeError as err:
+            # this is benign, just means the PJ is not connected yet
+            _LOGGER.debug("open_connection: %s", err)
+            return
+        except Exception as err:
+            _LOGGER.error("some error happened with open_connection: %s", err)
+        await asyncio.sleep(5)
 
-        while True:
-            try:
-                _LOGGER.debug("Pinging with cmd %s", cmd)
-                process = await asyncio.create_subprocess_shell(
-                    cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-                )
-
-                await process.communicate()
-
-                # if ping works, turn it on and exit
-                if process.returncode == 0:
-                    _LOGGER.debug("ping success, turning on")
-                    await asyncio.sleep(2)
-                    result = await self.jvc_client.open_connection()
-                    _LOGGER.debug("open connection result: %s", result)
-                    if not result:
-                        _LOGGER.error("Could not open connection: %s", result)
-                    self._state = True
-
-                    return
-
-                # wait and continue
-                await asyncio.sleep(sleep_interval)
-                continue
-
-            except asyncio.CancelledError as err:
-                process.terminate()
-                await process.wait()
-                _LOGGER.error(err)
-                return
-            # intentionally broad
-            except Exception as err:
-                _LOGGER.error("some error happened with ping: %s", err)
-                return
+    async def generate_unique_id(self) -> int:
+        """this is used to sort the queue because it contains non-comparable items"""
+        return next(self._counter)
 
     async def handle_queue(self):
         """
@@ -138,133 +135,131 @@ class JVCRemote(RemoteEntity):
         This is run in an event loop
         """
         while True:
-            # send all commands in queue
-            while (
-                # if the queue is not empty and we are not stopping
-                not self.command_queue.empty()
-                and not self.stop_processing_commands.is_set()
-                and not self.jvc_client.writer is None
-                and self.jvc_client.connection_open is True
-            ):
-                command: Iterable[str] = await self.command_queue.get()
-                _LOGGER.debug("sending queue command %s", command)
-                await self.process_command(command)
-                await asyncio.sleep(0.1)
-                # process the dead letter queue
-                await self.process_dlq()
-            # if we are stopping and the queue is not empty, clear it
-            # this is so it doesnt continuously print the stopped processing commands message
-            if (
-                self.stop_processing_commands.is_set()
-                and not self.command_queue.empty()
-            ):
-                await self.clear_queue()
-                _LOGGER.debug("Stopped processing commands")
-                # break to the outer loop so it can restart itself if needed
-                break
-            # save cpu
-            await asyncio.sleep(0.1)
-
-    async def clear_queue(self):
-        """Clear the queue"""
-        while not self.command_queue.empty():
-            await self.command_queue.get()
-            self.command_queue.task_done()
-
-        while not self.dead_letter_queue.empty():
-            await self.dead_letter_queue.get()
-            self.dead_letter_queue.task_done()
-
-        while not self.attribute_queue.empty():
-            await self.attribute_queue.get()
-            self.attribute_queue.task_done()
-
-    async def process_dlq(self):
-        """Process the dead letter queue"""
-        if (
-            not self.dead_letter_queue.empty()
-            and not self.jvc_client.writer is None
-            and self.jvc_client.connection_open is True
-        ):
-            command: Iterable[str] = await self.dead_letter_queue.get()
+            if not self.jvc_client.connection_open:
+                _LOGGER.debug("Connection is closed not processing commands")
+                await asyncio.sleep(5)
+                continue
             try:
-                # lock the command
-                await self.lock.acquire()
-                await self.jvc_client.exec_command(command)
-                _LOGGER.debug("Command executed successfully from DLQ: %s", command)
-                return  # Exit the retry loop upon success
-            except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.error("DLQ attempt failed for %s: %s", command, err)
-                return
-            finally:
-                self.lock.release()
-                self.dead_letter_queue.task_done()
-
-    async def process_command(self, command):
-        """async process a command"""
-        max_retries = 3
-        retry_delay = 1
-
-        # Retry the command a few times before adding to DLQasync_update
-        for attempt in range(max_retries):
-            try:
-                await self.lock.acquire()
-                err, res = await self.jvc_client.exec_command(command)
-                if res:
-                    _LOGGER.info("Command executed successfully: %s", command)
-                else:
-                    # getting a false means its not worth retrying
-                    _LOGGER.error("Command failed: %s", err)
-                break  # Exit the retry loop upon success
-            # intentionally catching all exceptions for dlq
-            except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.error(
-                    "Attempt %s failed for command %s: %s", attempt + 1, command, err
-                )
-                if attempt <= max_retries - 1:
-                    await asyncio.sleep(retry_delay)  # Wait before retrying
-                else:
-                    _LOGGER.error("Sending command to be retried later %s", command)
-                    # add the failed command to the DLQ
-                    await self.dead_letter_queue.put(command)
-            finally:
-                self.lock.release()
-
-        self.command_queue.task_done()
-
-    async def update_worker(self):
-        """Gets a function and attribute from a queue and runs it."""
-        while True:
-            if (
-                not self.stop_processing_commands.is_set()
-                and not self.jvc_client.writer is None
-                and self.jvc_client.connection_open is True
-            ):
-                # getter will be a function like get_source_status()
-                getter, attribute = await self.attribute_queue.get()
+                # send all commands in queue
+                _LOGGER.debug("processing commands")
+                # can be a command or a tuple[function, attribute]
+                # first item is the priority
                 try:
-                    # get lock
+                    priority, item = await asyncio.wait_for(
+                        self.command_queue.get(), timeout=5
+                    )
+                except asyncio.TimeoutError:
+                    _LOGGER.debug("Timeout in command queue")
+                    continue
+                _LOGGER.debug("got queue item %s with priority %s", item, priority)
+                # if its a 3 its an attribute tuple
+                if len(item) == 3:
+                    # discard the unique ID
+                    _, getter, attribute = item
                     _LOGGER.debug(
                         "trying attribute %s with getter %s", attribute, getter
                     )
-                    await self.lock.acquire()
-                    value = await getter()
+                    try:
+                        value = await asyncio.wait_for(getter(), timeout=3)
+                    except asyncio.TimeoutError:
+                        _LOGGER.debug("Timeout with item %s", item)
+                        try:
+                            self.command_queue.task_done()
+                        except ValueError:
+                            pass
+                        continue
                     _LOGGER.debug("got value %s for attribute %s", value, attribute)
                     setattr(self.jvc_client.attributes, attribute, value)
-                except Exception as err:  # pylint: disable=broad-except
-                    error_traceback = traceback.format_exc()
-                    _LOGGER.error(
-                        "Error getting attribute: %s -- %s", err, error_traceback
-                    )
-                finally:
+                    self.async_write_ha_state()
+                elif len(item) == 2:
+                    # run the item and set type to operation
+                    # HA sends commands like ["power, on"] which is one item
+                    _, command = item
+                    _LOGGER.debug("executing command %s", command)
+                    try:
+                        await asyncio.wait_for(
+                            self.jvc_client.exec_command(
+                                command, Header.operation.value
+                            ),
+                            timeout=5,
+                        )
+                    except asyncio.TimeoutError:
+                        _LOGGER.debug("Timeout with command %s", command)
+                        try:
+                            self.command_queue.task_done()
+                        except ValueError:
+                            pass
+                        continue
+                try:
+                    self.command_queue.task_done()
+                except ValueError:
+                    pass
+                await asyncio.sleep(0.1)
+                # if we are stopping and the queue is not empty, clear it
+                # this is so it doesnt continuously print the stopped processing commands message
+                if (
+                    self.stop_processing_commands.is_set()
+                    and not self.command_queue.empty()
+                ):
+                    await self.clear_queue()
+                    _LOGGER.debug("Stopped processing commands")
+                    # break to the outer loop so it can restart itself if needed
+                    break
+                # save cpu
+                await asyncio.sleep(0.1)
+            except asyncio.CancelledError:
+                _LOGGER.debug("handle_queue cancelled")
+                return
+            except TypeError as err:
+                _LOGGER.debug("TypeError in handle_queue, moving on: %s -- %s", err, item)
+                # in this case likely the queue priority is the same, lets just skip it
+                self.command_queue.task_done()
+                continue
+            except Exception as err:  # pylint: disable=broad-except
+                _LOGGER.error("Unhandled exception in handle_queue: %s", err)
+                await asyncio.sleep(5)
+
+    async def clear_queue(self):
+        """Clear the queue"""
+        try:
+            # clear the queue
+            while not self.command_queue.empty():
+                self.command_queue.get_nowait()
+                self.command_queue.task_done()
+
+            while not self.attribute_queue.empty():
+                self.attribute_queue.get_nowait()
+                self.attribute_queue.task_done()
+            # reset the counter
+            self._counter = itertools.count()
+        except ValueError:
+            pass
+
+    async def update_worker(self):
+        """Gets a function and attribute from a queue and adds it to the command interface"""
+        while True:
+            # this is just an async interface so the other processor doesnt become complicated
+
+            # getter will be a Callable
+            try:
+                unique_id, getter, attribute = await self.attribute_queue.get()
+                # add to the command queue with a single interface
+                await self.command_queue.put((1, (unique_id, getter, attribute)))
+                try:
                     self.attribute_queue.task_done()
-                    self.lock.release()
+                except ValueError:
+                    pass
+            except asyncio.TimeoutError:
+                _LOGGER.debug("Timeout in update_worker")
+            except asyncio.CancelledError:
+                _LOGGER.debug("update_worker cancelled")
+                return
             await asyncio.sleep(0.1)
 
     @property
     def should_poll(self):
         """Poll."""
-        return True
+        return False
 
     @property
     def name(self):
@@ -298,59 +293,74 @@ class JVCRemote(RemoteEntity):
     @property
     def is_on(self):
         """Return the last known state of the projector."""
-
         return self._state
 
     async def async_turn_on(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power on command."""
+
         self._state = True
-        await self.lock.acquire()
 
         try:
             await self.jvc_client.power_on()
             self.stop_processing_commands.clear()
             # save state
-            await self._state_storage.async_save(
-                {"connected": self.jvc_client.connection_open}
-            )
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning on projector: %s", err)
             self._state = False
         finally:
-            self.lock.release()
+            self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
+
         self._state = False
-        await self.lock.acquire()
 
         try:
             await self.jvc_client.power_off()
             self.stop_processing_commands.set()
+            await self.clear_queue()
             self.jvc_client.attributes.connection_active = False
             # save state
-            await self._state_storage.async_save(
-                {"connected": self.jvc_client.connection_open}
-            )
+        except Exception as err:  # pylint: disable=broad-except
+            _LOGGER.error("Error turning off projector: %s", err)
+            self._state = False
         finally:
-            self.lock.release()
+            self.async_write_ha_state()
 
-    async def async_update(self):
+    async def make_updates(self, attribute_getters: list[tuple[Callable, str]]):
+        """Add all the attribute getters to the queue."""
+        for getter, name in attribute_getters:
+            # you might be thinking why is this here?
+            # oh boy let me tell you
+            # TLDR priority queues need a unique ID to sort and you need to just dump one in
+            # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
+            # why this function deadlocks for no reason, and that HA hides error raises
+            unique_id = await self.generate_unique_id()
+            await self.attribute_queue.put((unique_id, getter, name))
+
+        # get hdr attributes
+        await self.attribute_queue.join()
+        # extra sleep to make sure all the updates are done
+        await asyncio.sleep(0.5)
+
+    async def async_update_state(self, now):
         """Retrieve latest state."""
-        if (
-            not self.stop_processing_commands.is_set()
-            and not self.jvc_client.writer is None
-            and self.jvc_client.connection_open is True
-        ):
+        if self.jvc_client.connection_open is True:
             # certain commands can only run at certain times
             # if they fail (i.e grayed out on menu) JVC will simply time out. Bad UX
             # have to add specific commands in a precise order
             # common stuff
             attribute_getters = []
-            _LOGGER.debug("updating state")
-            self._state = await self.jvc_client.is_on()
+            # get power
+            attribute_getters.append((self.jvc_client.is_on, "power_state"))
+            await self.make_updates(attribute_getters)
+
+            self._state = self.jvc_client.attributes.power_state
+            _LOGGER.debug("power state is : %s", self._state)
+
             if self._state:
-                _LOGGER.debug("getting attributes")
+                _LOGGER.debug("getting signal status and picture mode")
+                # takes a func and an attribute to write result into
                 attribute_getters.extend(
                     [
                         (self.jvc_client.get_source_status, "signal_status"),
@@ -359,8 +369,9 @@ class JVCRemote(RemoteEntity):
                     ]
                 )
                 # determine how to proceed based on above
-
-                if self.jvc_client.attributes.signal_status == "signal":
+                await self.make_updates(attribute_getters)
+                if self.jvc_client.attributes.signal_status is True:
+                    _LOGGER.debug("getting content type and input mode")
                     attribute_getters.extend(
                         [
                             (self.jvc_client.get_content_type, "content_type"),
@@ -369,11 +380,11 @@ class JVCRemote(RemoteEntity):
                                 "content_type_trans",
                             ),
                             (self.jvc_client.get_input_mode, "input_mode"),
-                            (self.jvc_client.get_anamorphic, "anamophic_mode"),
+                            (self.jvc_client.get_anamorphic, "anamorphic_mode"),
                             (self.jvc_client.get_source_display, "resolution"),
                         ]
                     )
-                if not "Unsupported" in self.jvc_client.model_family:
+                if "Unsupported" not in self.jvc_client.model_family:
                     attribute_getters.extend(
                         [
                             (self.jvc_client.get_install_mode, "installation_mode"),
@@ -404,20 +415,19 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
 
-                for getter, name in attribute_getters:
-                    await self.attribute_queue.put((getter, name))
-
-                # get hdr attributes
-                await self.attribute_queue.join()
+                await self.make_updates(attribute_getters)
 
                 # get laser value if fw is a least 3.0
                 if "NZ" in self.jvc_client.model_family:
-                    if float(self.jvc_client.attributes.software_version) >= 3.00:
-                        attribute_getters.extend(
-                            [
-                                (self.jvc_client.get_laser_value, "laser_value"),
-                            ]
-                        )
+                    try:
+                        if float(self.jvc_client.attributes.software_version) >= 3.00:
+                            attribute_getters.extend(
+                                [
+                                    (self.jvc_client.get_laser_value, "laser_value"),
+                                ]
+                            )
+                    except ValueError:
+                        pass
                 # HDR stuff
                 if any(
                     x in self.jvc_client.attributes.content_type_trans
@@ -439,20 +449,20 @@ class JVCRemote(RemoteEntity):
                     )
 
                 # get all the updates
-                for getter, name in attribute_getters:
-                    await self.attribute_queue.put((getter, name))
-
-                await self.attribute_queue.join()
+                await self.make_updates(attribute_getters)
             else:
                 _LOGGER.debug("PJ is off")
             # set the model and power
             self.jvc_client.attributes.model = self.jvc_client.model_family
-            self.jvc_client.attributes.power_state = self._state
+            self.async_write_ha_state()
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
         _LOGGER.debug("adding command %s to queue", command)
-        await self.command_queue.put(command)
+        # add timestamp to preserve cmd order
+        unique_id = await self.generate_unique_id()
+        await self.command_queue.put((0, (unique_id, command)))
+        _LOGGER.debug("command %s added to queue", command)
 
 
 async def async_setup_entry(

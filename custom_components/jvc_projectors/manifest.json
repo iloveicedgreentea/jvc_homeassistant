@@ -4,12 +4,13 @@
   "config_flow": true,
   "documentation": "https://github.com/iloveicedgreentea/jvc_homeassistant",
   "requirements": [
-    "pyjvc==4.2.1"
+    "pyjvc==4.3.51"
   ],
   "ssdp": [],
   "zeroconf": [],
   "homekit": {},
   "dependencies": [],
+  "loggers": ["custom_components.jvc_projectors"],
   "codeowners": [
     "@iloveicedgreentea"
   ],
