@@ -335,21 +335,21 @@ class JVCRemote(RemoteEntity):
             # TLDR priority queues need a unique ID to sort and you need to just dump one in
             # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
             # why this function deadlocks for no reason, and that HA hides error raises
+            # because the underlying items are not sortable
             unique_id = await self.generate_unique_id()
             await self.attribute_queue.put((unique_id, getter, name))
 
-        # get hdr attributes
+        # wait for attributes to be received
         await self.attribute_queue.join()
         # extra sleep to make sure all the updates are done
         await asyncio.sleep(0.5)
 
-    async def async_update_state(self, now):
+    async def async_update_state(self, _):
         """Retrieve latest state."""
         if self.jvc_client.connection_open is True:
             # certain commands can only run at certain times
             # if they fail (i.e grayed out on menu) JVC will simply time out. Bad UX
             # have to add specific commands in a precise order
-            # common stuff
             attribute_getters = []
             # get power
             attribute_getters.append((self.jvc_client.is_on, "power_state"))
@@ -459,10 +459,10 @@ class JVCRemote(RemoteEntity):
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
         _LOGGER.debug("adding command %s to queue", command)
-        # add timestamp to preserve cmd order
+        # add counter to preserve cmd order
         unique_id = await self.generate_unique_id()
         await self.command_queue.put((0, (unique_id, command)))
-        _LOGGER.debug("command %s added to queue", command)
+        _LOGGER.debug("command %s added to queue with counter %s", command, unique_id)
 
 
 async def async_setup_entry(
