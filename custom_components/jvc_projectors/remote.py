@@ -122,6 +122,7 @@ class JVCRemote(RemoteEntity):
             _LOGGER.debug("open_connection: %s", err)
             return
         except Exception as err:
+            await self.reset_everything()
             _LOGGER.error("some error happened with open_connection: %s", err)
         await asyncio.sleep(5)
 
@@ -211,27 +212,54 @@ class JVCRemote(RemoteEntity):
                 _LOGGER.debug("handle_queue cancelled")
                 return
             except TypeError as err:
-                _LOGGER.debug("TypeError in handle_queue, moving on: %s -- %s", err, item)
+                _LOGGER.debug(
+                    "TypeError in handle_queue, moving on: %s -- %s", err, item
+                )
                 # in this case likely the queue priority is the same, lets just skip it
                 self.command_queue.task_done()
                 continue
+            # catch wrong values
+            except ValueError as err:
+                _LOGGER.warning("ValueError in handle_queue: %s", err)
+                await self.reset_everything()
+                continue
             except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.error("Unhandled exception in handle_queue: %s", err)
-                await asyncio.sleep(5)
+                _LOGGER.debug("Unhandled exception in handle_queue: %s", err)
+                await self.reset_everything()
+                continue
+
+    async def reset_everything(self) -> None:
+        """resets EVERYTHING. Something with home assistant just doesnt play nice here"""
+
+        _LOGGER.debug("RESETTING - clearing everything")
+
+        try:
+            self.stop_processing_commands.set()
+            await self.clear_queue()
+            await self.jvc_client.reset_everything()
+        except Exception as err:
+            _LOGGER.error("Error reseting: %s", err)
+        finally:
+            self.stop_processing_commands.clear()
 
     async def clear_queue(self):
         """Clear the queue"""
         try:
             # clear the queue
+            _LOGGER.debug("Clearing command queue")
             while not self.command_queue.empty():
                 self.command_queue.get_nowait()
                 self.command_queue.task_done()
 
+            _LOGGER.debug("Clearing attr queue")
             while not self.attribute_queue.empty():
                 self.attribute_queue.get_nowait()
                 self.attribute_queue.task_done()
+
             # reset the counter
+            _LOGGER.debug("resetting counter")
             self._counter = itertools.count()
+
         except ValueError:
             pass
 
@@ -306,6 +334,7 @@ class JVCRemote(RemoteEntity):
             # save state
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning on projector: %s", err)
+            await self.reset_everything()
             self._state = False
         finally:
             self.async_write_ha_state()
@@ -323,6 +352,7 @@ class JVCRemote(RemoteEntity):
             # save state
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning off projector: %s", err)
+            await self.reset_everything()
             self._state = False
         finally:
             self.async_write_ha_state()
