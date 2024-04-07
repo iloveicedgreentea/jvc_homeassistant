@@ -4,7 +4,6 @@ from collections.abc import Iterable
 import logging
 import asyncio
 from dataclasses import asdict
-from typing import Callable
 import datetime
 import itertools
 
@@ -67,6 +66,8 @@ class JVCRemote(RemoteEntity):
         # counter for unique IDs
         self._counter = itertools.count()
 
+        self.attribute_getters = []
+
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
         # add the queue handler to the event loop
@@ -86,7 +87,12 @@ class JVCRemote(RemoteEntity):
 
         # handle updates
         _LOGGER.debug("adding update handler to loop")
-        update_handler = self.hass.loop.create_task(self.update_worker())
+        update_worker = self.hass.loop.create_task(self.update_worker())
+        self.tasks.append(update_worker)
+
+        # handle sending attributes to queue
+        _LOGGER.debug("adding update handler to loop")
+        update_handler = self.hass.loop.create_task(self.make_updates())
         self.tasks.append(update_handler)
 
     async def async_will_remove_from_hass(self) -> None:
@@ -165,6 +171,9 @@ class JVCRemote(RemoteEntity):
                     except asyncio.TimeoutError:
                         _LOGGER.debug("Timeout with item %s", item)
                         try:
+                            # if the above command times out, but we wrote to buffer, that means there is unread data in response
+                            # this needs to clear the buffer if timeout
+                            await self.jvc_client.reset_everything()
                             self.command_queue.task_done()
                         except ValueError:
                             pass
@@ -357,9 +366,12 @@ class JVCRemote(RemoteEntity):
         finally:
             self.async_write_ha_state()
 
-    async def make_updates(self, attribute_getters: list[tuple[Callable, str]]):
-        """Add all the attribute getters to the queue."""
-        for getter, name in attribute_getters:
+    async def make_updates(self):
+        """
+        Runs as a background task
+        Add all the attribute getters to the queue.
+        """
+        for getter, name in self.attribute_getters:
             # you might be thinking why is this here?
             # oh boy let me tell you
             # TLDR priority queues need a unique ID to sort and you need to just dump one in
@@ -369,21 +381,19 @@ class JVCRemote(RemoteEntity):
             unique_id = await self.generate_unique_id()
             await self.attribute_queue.put((unique_id, getter, name))
 
-        # wait for attributes to be received
-        await self.attribute_queue.join()
-        # extra sleep to make sure all the updates are done
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
 
     async def async_update_state(self, _):
-        """Retrieve latest state."""
+        """
+        Retrieve latest state.
+        This will push the attributes to the queue and be processed by make_updates
+        """
         if self.jvc_client.connection_open is True:
             # certain commands can only run at certain times
             # if they fail (i.e grayed out on menu) JVC will simply time out. Bad UX
             # have to add specific commands in a precise order
-            attribute_getters = []
             # get power
-            attribute_getters.append((self.jvc_client.is_on, "power_state"))
-            await self.make_updates(attribute_getters)
+            self.attribute_getters.append((self.jvc_client.is_on, "power_state"))
 
             self._state = self.jvc_client.attributes.power_state
             _LOGGER.debug("power state is : %s", self._state)
@@ -391,18 +401,16 @@ class JVCRemote(RemoteEntity):
             if self._state:
                 _LOGGER.debug("getting signal status and picture mode")
                 # takes a func and an attribute to write result into
-                attribute_getters.extend(
+                self.attribute_getters.extend(
                     [
                         (self.jvc_client.get_source_status, "signal_status"),
                         (self.jvc_client.get_picture_mode, "picture_mode"),
                         (self.jvc_client.get_software_version, "software_version"),
                     ]
                 )
-                # determine how to proceed based on above
-                await self.make_updates(attribute_getters)
                 if self.jvc_client.attributes.signal_status is True:
                     _LOGGER.debug("getting content type and input mode")
-                    attribute_getters.extend(
+                    self.attribute_getters.extend(
                         [
                             (self.jvc_client.get_content_type, "content_type"),
                             (
@@ -415,7 +423,7 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
                 if "Unsupported" not in self.jvc_client.model_family:
-                    attribute_getters.extend(
+                    self.attribute_getters.extend(
                         [
                             (self.jvc_client.get_install_mode, "installation_mode"),
                             (self.jvc_client.get_aspect_ratio, "aspect_ratio"),
@@ -425,11 +433,11 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
                 if any(x in self.jvc_client.model_family for x in ["NX9", "NZ"]):
-                    attribute_getters.append(
+                    self.attribute_getters.append(
                         (self.jvc_client.get_eshift_mode, "eshift"),
                     )
                 if "NZ" in self.jvc_client.model_family:
-                    attribute_getters.extend(
+                    self.attribute_getters.extend(
                         [
                             (self.jvc_client.get_laser_power, "laser_power"),
                             (self.jvc_client.get_laser_mode, "laser_mode"),
@@ -438,20 +446,18 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
                 else:
-                    attribute_getters.extend(
+                    self.attribute_getters.extend(
                         [
                             (self.jvc_client.get_lamp_power, "lamp_power"),
                             (self.jvc_client.get_lamp_time, "lamp_time"),
                         ]
                     )
 
-                await self.make_updates(attribute_getters)
-
                 # get laser value if fw is a least 3.0
                 if "NZ" in self.jvc_client.model_family:
                     try:
                         if float(self.jvc_client.attributes.software_version) >= 3.00:
-                            attribute_getters.extend(
+                            self.attribute_getters.extend(
                                 [
                                     (self.jvc_client.get_laser_value, "laser_value"),
                                 ]
@@ -464,13 +470,13 @@ class JVCRemote(RemoteEntity):
                     for x in ["hdr", "hlg"]
                 ):
                     if "NZ" in self.jvc_client.model_family:
-                        attribute_getters.append(
+                        self.attribute_getters.append(
                             (
                                 self.jvc_client.get_theater_optimizer_state,
                                 "theater_optimizer",
                             ),
                         )
-                    attribute_getters.extend(
+                    self.attribute_getters.extend(
                         [
                             (self.jvc_client.get_hdr_processing, "hdr_processing"),
                             (self.jvc_client.get_hdr_level, "hdr_level"),
@@ -478,8 +484,6 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
 
-                # get all the updates
-                await self.make_updates(attribute_getters)
             else:
                 _LOGGER.debug("PJ is off")
             # set the model and power
