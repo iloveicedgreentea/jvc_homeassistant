@@ -274,6 +274,12 @@ class JVCRemote(RemoteEntity):
 
             # getter will be a Callable
             try:
+                # queue backpressure
+                if self.command_queue.qsize() > 10:
+                    # this allows the queue to process stuff without filling up
+                    _LOGGER.debug("Queue is full, waiting to add attributes")
+                    await asyncio.sleep(2)
+                    continue
                 unique_id, getter, attribute = await self.attribute_queue.get()
                 # add to the command queue with a single interface
                 await self.command_queue.put((1, (unique_id, getter, attribute)))
