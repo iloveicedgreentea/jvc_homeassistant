@@ -8,6 +8,7 @@ import datetime
 import itertools
 
 from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator, Header
+from jvc_projector.error_classes import ShouldReconnectError
 from homeassistant.helpers.event import async_track_time_interval
 
 from .const import DOMAIN
@@ -202,6 +203,10 @@ class JVCRemote(RemoteEntity):
                             self.command_queue.task_done()
                         except ValueError:
                             pass
+                        continue
+                    except ShouldReconnectError:
+                        _LOGGER.error("Lost connection, reconnecting")
+                        await self.reset_everything()
                         continue
                 try:
                     self.command_queue.task_done()
