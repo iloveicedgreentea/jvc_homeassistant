@@ -132,17 +132,25 @@ class JVCRemote(RemoteEntity):
         """this is used to sort the queue because it contains non-comparable items"""
         return next(self._counter)
 
+    async def wait_until_connected(self, wait_time: float = 0.1) -> bool:
+        """Wait until the connection is open."""
+        while not self.jvc_client.connection_open:
+            await asyncio.sleep(wait_time)
+        return True
+
     async def handle_queue(self):
         """
         Handle items in command queue.
         This is run in an event loop
         """
         while True:
-            if not self.jvc_client.connection_open:
-                await asyncio.sleep(5)
-                continue
+            await self.wait_until_connected(5)
             try:
-                _LOGGER.debug("queue size is %s - attribute size is %s", self.command_queue.qsize(), self.attribute_queue.qsize())
+                _LOGGER.debug(
+                    "queue size is %s - attribute size is %s",
+                    self.command_queue.qsize(),
+                    self.attribute_queue.qsize(),
+                )
                 # send all commands in queue
                 # can be a command or a tuple[function, attribute]
                 # first item is the priority
@@ -224,12 +232,12 @@ class JVCRemote(RemoteEntity):
                 continue
             # catch wrong values
             except ValueError as err:
-                _LOGGER.warning("ValueError in handle_queue: %s", err)
+                _LOGGER.error("ValueError in handle_queue: %s", err)
                 # Not sure what causes these but we can at least try to ignore them
                 self.command_queue.task_done()
                 continue
             except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.debug("Unhandled exception in handle_queue: %s", err)
+                _LOGGER.error("Unhandled exception in handle_queue: %s", err)
                 await self.reset_everything()
                 continue
 
@@ -338,7 +346,7 @@ class JVCRemote(RemoteEntity):
         """Send the power on command."""
 
         self._state = True
-
+        await self.wait_until_connected()
         try:
             await self.jvc_client.power_on()
             self.stop_processing_commands.clear()
@@ -352,14 +360,13 @@ class JVCRemote(RemoteEntity):
 
     async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
         """Send the power off command."""
-
+        await self.wait_until_connected()
         self._state = False
 
         try:
             await self.jvc_client.power_off()
             self.stop_processing_commands.set()
             await self.clear_queue()
-            self.jvc_client.attributes.connection_active = False
             # save state
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning off projector: %s", err)
@@ -376,7 +383,6 @@ class JVCRemote(RemoteEntity):
         while True:
             # copy it so we can remove items from it
             attrs = self.attribute_getters.copy()
-            _LOGGER.debug("Attribute size is %s", self.attribute_getters)
             for getter, name in attrs:
                 # you might be thinking why is this here?
                 # oh boy let me tell you
@@ -397,7 +403,7 @@ class JVCRemote(RemoteEntity):
         Retrieve latest state.
         This will push the attributes to the queue and be processed by make_updates
         """
-        if self.jvc_client.connection_open is True:
+        if await self.wait_until_connected():
             # certain commands can only run at certain times
             # if they fail (i.e grayed out on menu) JVC will simply time out. Bad UX
             # have to add specific commands in a precise order
