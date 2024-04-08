@@ -4,7 +4,7 @@
   "config_flow": true,
   "documentation": "https://github.com/iloveicedgreentea/jvc_homeassistant",
   "requirements": [
-    "pyjvc==4.4.0"
+    "pyjvc==4.4.2"
   ],
   "ssdp": [],
   "zeroconf": [],
@@ -17,5 +17,5 @@
     "@iloveicedgreentea"
   ],
   "iot_class": "local_polling",
-  "version": "4.2.9"
+  "version": "4.4.2"
 }
