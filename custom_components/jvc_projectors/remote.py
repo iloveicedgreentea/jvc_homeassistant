@@ -225,7 +225,8 @@ class JVCRemote(RemoteEntity):
             # catch wrong values
             except ValueError as err:
                 _LOGGER.warning("ValueError in handle_queue: %s", err)
-                await self.reset_everything()
+                # Not sure what causes these but we can at least try to ignore them
+                self.command_queue.task_done()
                 continue
             except Exception as err:  # pylint: disable=broad-except
                 _LOGGER.debug("Unhandled exception in handle_queue: %s", err)
