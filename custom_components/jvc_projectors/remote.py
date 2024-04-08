@@ -66,7 +66,7 @@ class JVCRemote(RemoteEntity):
         # counter for unique IDs
         self._counter = itertools.count()
 
-        self.attribute_getters = []
+        self.attribute_getters = set()
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
@@ -76,22 +76,18 @@ class JVCRemote(RemoteEntity):
             self.hass, self.async_update_state, datetime.timedelta(seconds=5)
         )
         # open connection
-        _LOGGER.debug("adding conection to loop")
         conn = self.hass.loop.create_task(self.open_conn())
         self.tasks.append(conn)
 
         # handle commands
-        _LOGGER.debug("adding queue handler to loop")
         queue_handler = self.hass.loop.create_task(self.handle_queue())
         self.tasks.append(queue_handler)
 
         # handle updates
-        _LOGGER.debug("adding update handler to loop")
         update_worker = self.hass.loop.create_task(self.update_worker())
         self.tasks.append(update_worker)
 
         # handle sending attributes to queue
-        _LOGGER.debug("adding update handler to loop")
         update_handler = self.hass.loop.create_task(self.make_updates())
         self.tasks.append(update_handler)
 
@@ -143,12 +139,11 @@ class JVCRemote(RemoteEntity):
         """
         while True:
             if not self.jvc_client.connection_open:
-                _LOGGER.debug("Connection is closed not processing commands")
                 await asyncio.sleep(5)
                 continue
             try:
+                _LOGGER.debug("queue size is %s - attribute size is %s", self.command_queue.qsize(), self.attribute_queue.qsize())
                 # send all commands in queue
-                _LOGGER.debug("processing commands")
                 # can be a command or a tuple[function, attribute]
                 # first item is the priority
                 try:
@@ -394,15 +389,14 @@ class JVCRemote(RemoteEntity):
             # if they fail (i.e grayed out on menu) JVC will simply time out. Bad UX
             # have to add specific commands in a precise order
             # get power
-            self.attribute_getters.append((self.jvc_client.is_on, "power_state"))
+            self.attribute_getters.add((self.jvc_client.is_on, "power_state"))
 
             self._state = self.jvc_client.attributes.power_state
             _LOGGER.debug("power state is : %s", self._state)
 
             if self._state:
-                _LOGGER.debug("getting signal status and picture mode")
                 # takes a func and an attribute to write result into
-                self.attribute_getters.extend(
+                self.attribute_getters.update(
                     [
                         (self.jvc_client.get_source_status, "signal_status"),
                         (self.jvc_client.get_picture_mode, "picture_mode"),
@@ -410,8 +404,7 @@ class JVCRemote(RemoteEntity):
                     ]
                 )
                 if self.jvc_client.attributes.signal_status is True:
-                    _LOGGER.debug("getting content type and input mode")
-                    self.attribute_getters.extend(
+                    self.attribute_getters.update(
                         [
                             (self.jvc_client.get_content_type, "content_type"),
                             (
@@ -424,7 +417,7 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
                 if "Unsupported" not in self.jvc_client.model_family:
-                    self.attribute_getters.extend(
+                    self.attribute_getters.update(
                         [
                             (self.jvc_client.get_install_mode, "installation_mode"),
                             (self.jvc_client.get_aspect_ratio, "aspect_ratio"),
@@ -434,11 +427,11 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
                 if any(x in self.jvc_client.model_family for x in ["NX9", "NZ"]):
-                    self.attribute_getters.append(
+                    self.attribute_getters.add(
                         (self.jvc_client.get_eshift_mode, "eshift"),
                     )
                 if "NZ" in self.jvc_client.model_family:
-                    self.attribute_getters.extend(
+                    self.attribute_getters.update(
                         [
                             (self.jvc_client.get_laser_power, "laser_power"),
                             (self.jvc_client.get_laser_mode, "laser_mode"),
@@ -447,7 +440,7 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
                 else:
-                    self.attribute_getters.extend(
+                    self.attribute_getters.update(
                         [
                             (self.jvc_client.get_lamp_power, "lamp_power"),
                             (self.jvc_client.get_lamp_time, "lamp_time"),
@@ -458,7 +451,7 @@ class JVCRemote(RemoteEntity):
                 if "NZ" in self.jvc_client.model_family:
                     try:
                         if float(self.jvc_client.attributes.software_version) >= 3.00:
-                            self.attribute_getters.extend(
+                            self.attribute_getters.update(
                                 [
                                     (self.jvc_client.get_laser_value, "laser_value"),
                                 ]
@@ -471,13 +464,13 @@ class JVCRemote(RemoteEntity):
                     for x in ["hdr", "hlg"]
                 ):
                     if "NZ" in self.jvc_client.model_family:
-                        self.attribute_getters.append(
+                        self.attribute_getters.add(
                             (
                                 self.jvc_client.get_theater_optimizer_state,
                                 "theater_optimizer",
                             ),
                         )
-                    self.attribute_getters.extend(
+                    self.attribute_getters.update(
                         [
                             (self.jvc_client.get_hdr_processing, "hdr_processing"),
                             (self.jvc_client.get_hdr_level, "hdr_level"),
@@ -485,15 +478,12 @@ class JVCRemote(RemoteEntity):
                         ]
                     )
 
-            else:
-                _LOGGER.debug("PJ is off")
             # set the model and power
             self.jvc_client.attributes.model = self.jvc_client.model_family
             self.async_write_ha_state()
 
     async def async_send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
-        _LOGGER.debug("adding command %s to queue", command)
         # add counter to preserve cmd order
         unique_id = await self.generate_unique_id()
         await self.command_queue.put((0, (unique_id, command)))
