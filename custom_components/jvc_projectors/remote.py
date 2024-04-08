@@ -373,7 +373,10 @@ class JVCRemote(RemoteEntity):
         Add all the attribute getters to the queue.
         """
         while True:
-            for getter, name in self.attribute_getters:
+            # copy it so we can remove items from it
+            attrs = self.attribute_getters.copy()
+            _LOGGER.debug("Attribute size is %s", self.attribute_getters)
+            for getter, name in attrs:
                 # you might be thinking why is this here?
                 # oh boy let me tell you
                 # TLDR priority queues need a unique ID to sort and you need to just dump one in
@@ -382,6 +385,9 @@ class JVCRemote(RemoteEntity):
                 # because the underlying items are not sortable
                 unique_id = await self.generate_unique_id()
                 await self.attribute_queue.put((unique_id, getter, name))
+
+                # remove the added item from the set
+                self.attribute_getters.discard((getter, name))
 
             await asyncio.sleep(0.1)
 
