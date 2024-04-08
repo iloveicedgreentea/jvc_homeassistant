@@ -171,6 +171,9 @@ class JVCRemote(RemoteEntity):
                         "trying attribute %s with getter %s", attribute, getter
                     )
                     try:
+                        await asyncio.sleep(
+                            0.2
+                        )  # PJ seems to freeze if you send too many commands
                         value = await asyncio.wait_for(getter(), timeout=3)
                     except asyncio.TimeoutError:
                         _LOGGER.debug("Timeout with item %s", item)
@@ -388,18 +391,23 @@ class JVCRemote(RemoteEntity):
         while True:
             # copy it so we can remove items from it
             attrs = self.attribute_getters.copy()
+            # dedupe by name
+            dedupe = set()
             for getter, name in attrs:
-                # you might be thinking why is this here?
-                # oh boy let me tell you
-                # TLDR priority queues need a unique ID to sort and you need to just dump one in
-                # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
-                # why this function deadlocks for no reason, and that HA hides error raises
-                # because the underlying items are not sortable
-                unique_id = await self.generate_unique_id()
-                await self.attribute_queue.put((unique_id, getter, name))
+                if name not in dedupe:
+                    # you might be thinking why is this here?
+                    # oh boy let me tell you
+                    # TLDR priority queues need a unique ID to sort and you need to just dump one in
+                    # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
+                    # why this function deadlocks for no reason, and that HA hides error raises
+                    # because the underlying items are not sortable
+                    unique_id = await self.generate_unique_id()
+                    await self.attribute_queue.put((unique_id, getter, name))
+                    # add that we processed it
+                    dedupe.add(name)
 
-                # remove the added item from the set
-                self.attribute_getters.discard((getter, name))
+                    # remove the added item from the shared set
+                    self.attribute_getters.discard((getter, name))
 
             await asyncio.sleep(0.1)
 
