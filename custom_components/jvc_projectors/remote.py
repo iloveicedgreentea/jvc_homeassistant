@@ -371,17 +371,18 @@ class JVCRemote(RemoteEntity):
         Runs as a background task
         Add all the attribute getters to the queue.
         """
-        for getter, name in self.attribute_getters:
-            # you might be thinking why is this here?
-            # oh boy let me tell you
-            # TLDR priority queues need a unique ID to sort and you need to just dump one in
-            # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
-            # why this function deadlocks for no reason, and that HA hides error raises
-            # because the underlying items are not sortable
-            unique_id = await self.generate_unique_id()
-            await self.attribute_queue.put((unique_id, getter, name))
+        while True:
+            for getter, name in self.attribute_getters:
+                # you might be thinking why is this here?
+                # oh boy let me tell you
+                # TLDR priority queues need a unique ID to sort and you need to just dump one in
+                # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
+                # why this function deadlocks for no reason, and that HA hides error raises
+                # because the underlying items are not sortable
+                unique_id = await self.generate_unique_id()
+                await self.attribute_queue.put((unique_id, getter, name))
 
-        await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
 
     async def async_update_state(self, _):
         """
