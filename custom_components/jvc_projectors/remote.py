@@ -63,6 +63,8 @@ class JVCRemote(RemoteEntity):
 
         self.hass = hass
         self._update_interval = None
+        # seconds to wait between asking for updates
+        self.update_interval = 10
 
         # counter for unique IDs
         self._counter = itertools.count()
@@ -74,7 +76,9 @@ class JVCRemote(RemoteEntity):
         # add the queue handler to the event loop
         # get updates in a set interval
         self._update_interval = async_track_time_interval(
-            self.hass, self.async_update_state, datetime.timedelta(seconds=5)
+            self.hass,
+            self.async_update_state,
+            datetime.timedelta(seconds=self.update_interval),
         )
         # open connection
         conn = self.hass.loop.create_task(self.open_conn())
@@ -172,7 +176,7 @@ class JVCRemote(RemoteEntity):
                     )
                     try:
                         await asyncio.sleep(
-                            0.2
+                            0.1
                         )  # PJ seems to freeze if you send too many commands
                         value = await asyncio.wait_for(getter(), timeout=3)
                     except asyncio.TimeoutError:
@@ -265,24 +269,17 @@ class JVCRemote(RemoteEntity):
 
     async def clear_queue(self):
         """Clear the queue"""
-        try:
-            # clear the queue
-            _LOGGER.debug("Clearing command queue")
-            while not self.command_queue.empty():
-                self.command_queue.get_nowait()
-                self.command_queue.task_done()
+        # clear the queue
+        _LOGGER.debug("Clearing command queue")
+        self.command_queue = asyncio.PriorityQueue()
+        _LOGGER.debug("Cleared command queue which is now %s", self.command_queue.qsize())
 
-            _LOGGER.debug("Clearing attr queue")
-            while not self.attribute_queue.empty():
-                self.attribute_queue.get_nowait()
-                self.attribute_queue.task_done()
+        _LOGGER.debug("Clearing attr queue")
+        self.attribute_queue = asyncio.Queue()
 
-            # reset the counter
-            _LOGGER.debug("resetting counter")
-            self._counter = itertools.count()
-
-        except ValueError:
-            pass
+        # reset the counter
+        _LOGGER.debug("resetting counter")
+        self._counter = itertools.count()
 
     async def update_worker(self):
         """Gets a function and attribute from a queue and adds it to the command interface"""
@@ -302,8 +299,11 @@ class JVCRemote(RemoteEntity):
                 await self.command_queue.put((1, (unique_id, getter, attribute)))
                 try:
                     self.attribute_queue.task_done()
+                # catch error from task_done
                 except ValueError:
                     pass
+                # rate limit because JVC seems to crash if you send too many commands
+                await asyncio.sleep(0.5)
             except asyncio.TimeoutError:
                 _LOGGER.debug("Timeout in update_worker")
             except asyncio.CancelledError:
