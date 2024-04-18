@@ -49,6 +49,8 @@ class JVCRemote(RemoteEntity):
         self._attr_unique_id = entry.entry_id
 
         self.jvc_client = jvc_client
+        # used to lock the client
+        self.jvc_client_lock = asyncio.Lock()
         self.jvc_client.logger = _LOGGER
         # attributes
         self._state = False
@@ -103,8 +105,8 @@ class JVCRemote(RemoteEntity):
         if self._update_interval:
             self._update_interval()
             self._update_interval = None
-
-        await self.jvc_client.close_connection()
+        async with self.jvc_client_lock:
+            await self.jvc_client.close_connection()
         # cancel all tasks
         for task in self.tasks:
             if not task.done():
@@ -184,7 +186,8 @@ class JVCRemote(RemoteEntity):
                         try:
                             # if the above command times out, but we wrote to buffer, that means there is unread data in response
                             # this needs to clear the buffer if timeout
-                            await self.jvc_client.reset_everything()
+                            async with self.jvc_client_lock:
+                                await self.jvc_client.reset_everything()
                             self.command_queue.task_done()
                         except ValueError:
                             pass
@@ -198,12 +201,13 @@ class JVCRemote(RemoteEntity):
                     _, command = item
                     _LOGGER.debug("executing command %s", command)
                     try:
-                        await asyncio.wait_for(
-                            self.jvc_client.exec_command(
-                                command, Header.operation.value
-                            ),
-                            timeout=5,
-                        )
+                        async with self.jvc_client_lock:
+                            await asyncio.wait_for(
+                                self.jvc_client.exec_command(
+                                    command, Header.operation.value
+                                ),
+                                timeout=5,
+                            )
                     except asyncio.TimeoutError:
                         _LOGGER.debug("Timeout with command %s", command)
                         try:
@@ -261,7 +265,8 @@ class JVCRemote(RemoteEntity):
         try:
             self.stop_processing_commands.set()
             await self.clear_queue()
-            await self.jvc_client.reset_everything()
+            async with self.jvc_client_lock:
+                await self.jvc_client.reset_everything()
         except Exception as err:
             _LOGGER.error("Error reseting: %s", err)
         finally:
@@ -289,11 +294,11 @@ class JVCRemote(RemoteEntity):
             # getter will be a Callable
             try:
                 # queue backpressure
-                if self.command_queue.qsize() > 10:
+                while self.command_queue.qsize() > 10:
                     # this allows the queue to process stuff without filling up
                     _LOGGER.debug("Queue is full, waiting to add attributes")
-                    await asyncio.sleep(2)
-                    continue
+                    await asyncio.sleep(1)
+
                 unique_id, getter, attribute = await self.attribute_queue.get()
                 # add to the command queue with a single interface
                 await self.command_queue.put((1, (unique_id, getter, attribute)))
@@ -303,7 +308,7 @@ class JVCRemote(RemoteEntity):
                 except ValueError:
                     pass
                 # rate limit because JVC seems to crash if you send too many commands
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.3)
             except asyncio.TimeoutError:
                 _LOGGER.debug("Timeout in update_worker")
             except asyncio.CancelledError:
@@ -356,7 +361,8 @@ class JVCRemote(RemoteEntity):
         self._state = True
         await self.wait_until_connected()
         try:
-            await self.jvc_client.power_on()
+            async with self.jvc_client_lock:
+                await self.jvc_client.power_on()
             self.stop_processing_commands.clear()
             # save state
         except Exception as err:  # pylint: disable=broad-except
@@ -372,7 +378,8 @@ class JVCRemote(RemoteEntity):
         self._state = False
 
         try:
-            await self.jvc_client.power_off()
+            async with self.jvc_client_lock:
+                await self.jvc_client.power_off()
             self.stop_processing_commands.set()
             await self.clear_queue()
             # save state
@@ -389,25 +396,21 @@ class JVCRemote(RemoteEntity):
         Add all the attribute getters to the queue.
         """
         while True:
-            # copy it so we can remove items from it
+            # Create a copy of the attribute_getters set
             attrs = self.attribute_getters.copy()
-            # dedupe by name
-            dedupe = set()
-            for getter, name in attrs:
-                if name not in dedupe:
-                    # you might be thinking why is this here?
-                    # oh boy let me tell you
-                    # TLDR priority queues need a unique ID to sort and you need to just dump one in
-                    # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
-                    # why this function deadlocks for no reason, and that HA hides error raises
-                    # because the underlying items are not sortable
-                    unique_id = await self.generate_unique_id()
-                    await self.attribute_queue.put((unique_id, getter, name))
-                    # add that we processed it
-                    dedupe.add(name)
 
-                    # remove the added item from the shared set
-                    self.attribute_getters.discard((getter, name))
+            # Clear the original attribute_getters set
+            self.attribute_getters.clear()
+
+            for getter, name in attrs:
+                # you might be thinking why is this here?
+                # oh boy let me tell you
+                # TLDR priority queues need a unique ID to sort and you need to just dump one in
+                # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
+                # why this function deadlocks for no reason, and that HA hides error raises
+                # because the underlying items are not sortable
+                unique_id = await self.generate_unique_id()
+                await self.attribute_queue.put((unique_id, getter, name))
 
             await asyncio.sleep(0.1)
 
