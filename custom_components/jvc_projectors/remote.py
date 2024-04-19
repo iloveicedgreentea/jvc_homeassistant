@@ -208,7 +208,7 @@ class JVCRemote(RemoteEntity):
                                 ),
                                 timeout=5,
                             )
-                            # when a command is sent it shifts the buffer by one, this seems to just be easier than figuring that out tbh
+                            # when a command is sent it shifts the buffer by one, this fixes the queue position
                             await self.jvc_client.commander.read_until_empty()
                     except asyncio.TimeoutError:
                         _LOGGER.debug("Timeout with command %s", command)
