@@ -208,6 +208,8 @@ class JVCRemote(RemoteEntity):
                                 ),
                                 timeout=5,
                             )
+                            # when a command is sent it shifts the buffer by one, this seems to just be easier than figuring that out tbh
+                            await self.jvc_client.commander.read_until_empty()
                     except asyncio.TimeoutError:
                         _LOGGER.debug("Timeout with command %s", command)
                         try:
@@ -277,7 +279,9 @@ class JVCRemote(RemoteEntity):
         # clear the queue
         _LOGGER.debug("Clearing command queue")
         self.command_queue = asyncio.PriorityQueue()
-        _LOGGER.debug("Cleared command queue which is now %s", self.command_queue.qsize())
+        _LOGGER.debug(
+            "Cleared command queue which is now %s", self.command_queue.qsize()
+        )
 
         _LOGGER.debug("Clearing attr queue")
         self.attribute_queue = asyncio.Queue()
