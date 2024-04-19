@@ -8,7 +8,7 @@ import datetime
 import itertools
 
 from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator, Header
-from jvc_projector.error_classes import ShouldReconnectError
+from jvc_projector.error_classes import ShouldReconnectError, ConnectionClosedError
 from homeassistant.helpers.event import async_track_time_interval
 
 from .const import DOMAIN
@@ -365,6 +365,11 @@ class JVCRemote(RemoteEntity):
                 await self.jvc_client.power_on()
             self.stop_processing_commands.clear()
             # save state
+        except ConnectionClosedError:
+            _LOGGER.error("Lost connection, reconnecting")
+            await self.open_conn()
+            # try again
+            await self.async_turn_on()
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning on projector: %s", err)
             await self.reset_everything()
