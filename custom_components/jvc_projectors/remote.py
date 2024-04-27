@@ -66,7 +66,8 @@ class JVCRemote(RemoteEntity):
         self.hass = hass
         self._update_interval = None
         # seconds to wait between asking for updates
-        self.update_interval = 10
+        # TODO: add to config flow
+        self.update_interval = 15
 
         # counter for unique IDs
         self._counter = itertools.count()
@@ -83,6 +84,10 @@ class JVCRemote(RemoteEntity):
             datetime.timedelta(seconds=self.update_interval),
         )
         # open connection
+        # TODO: this should always detect if the connection is open
+        conn_mon = self.hass.loop.create_task(self.connection_monitor())
+        self.tasks.append(conn_mon)
+
         conn = self.hass.loop.create_task(self.open_conn())
         self.tasks.append(conn)
 
@@ -111,6 +116,30 @@ class JVCRemote(RemoteEntity):
         for task in self.tasks:
             if not task.done():
                 task.cancel()
+
+    async def connection_monitor(self):
+        while True:
+            await asyncio.sleep(5)
+            try:
+                _LOGGER.debug("Checking connection to JVC projector")
+                # Send a simple command to test the connection
+                response = await self.jvc_client.run_null_command()
+                if not response:
+                    _LOGGER.debug("Connection to JVC projector is closed")
+                    raise ConnectionError("Connection test failed")
+                _LOGGER.debug("Connection to JVC projector is OK")
+            except asyncio.CancelledError:
+                return
+            except (
+                ConnectionClosedError,
+                ConnectionError,
+                asyncio.TimeoutError,
+                BrokenPipeError,
+            ):
+                _LOGGER.warning(
+                    "Connection to JVC projector is closed or unresponsive. Attempting to reconnect..."
+                )
+                await self.open_conn()
 
     async def open_conn(self):
         """Open the connection to the projector."""
@@ -180,7 +209,8 @@ class JVCRemote(RemoteEntity):
                         await asyncio.sleep(
                             0.1
                         )  # PJ seems to freeze if you send too many commands
-                        value = await asyncio.wait_for(getter(), timeout=3)
+                        async with self.jvc_client_lock:
+                            value = await asyncio.wait_for(getter(), timeout=3)
                     except asyncio.TimeoutError:
                         _LOGGER.debug("Timeout with item %s", item)
                         try:
@@ -311,8 +341,6 @@ class JVCRemote(RemoteEntity):
                 # catch error from task_done
                 except ValueError:
                     pass
-                # rate limit because JVC seems to crash if you send too many commands
-                await asyncio.sleep(0.3)
             except asyncio.TimeoutError:
                 _LOGGER.debug("Timeout in update_worker")
             except asyncio.CancelledError:
@@ -364,16 +392,12 @@ class JVCRemote(RemoteEntity):
 
         self._state = True
         await self.wait_until_connected()
+        # TODO: always retry
         try:
             async with self.jvc_client_lock:
                 await self.jvc_client.power_on()
             self.stop_processing_commands.clear()
             # save state
-        except ConnectionClosedError:
-            _LOGGER.error("Lost connection, reconnecting")
-            await self.open_conn()
-            # try again
-            await self.async_turn_on()
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.error("Error turning on projector: %s", err)
             await self.reset_everything()
@@ -412,12 +436,6 @@ class JVCRemote(RemoteEntity):
             self.attribute_getters.clear()
 
             for getter, name in attrs:
-                # you might be thinking why is this here?
-                # oh boy let me tell you
-                # TLDR priority queues need a unique ID to sort and you need to just dump one in
-                # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
-                # why this function deadlocks for no reason, and that HA hides error raises
-                # because the underlying items are not sortable
                 unique_id = await self.generate_unique_id()
                 await self.attribute_queue.put((unique_id, getter, name))
 
