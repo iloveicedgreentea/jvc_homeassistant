@@ -1,6 +1,10 @@
 # JVC Projectors Home Assistant Integration
+This is archived because I am dedicating my efforts to creating essentially Home Assistant but for home theaters specifically, in Go. 
+
+If you have issues, switch to the "official" JVC integration. It doesn't have every feature and attribute at the moment though.
 
 This is the Home Assistant JVC Component implementing my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_improved)
+
 
 ## Features
 
@@ -13,15 +17,12 @@ All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_pr
 - HA Attributes for current settings like power state, picture mode, laser mode, input, etc
 - and so on
 
-It will run each button/command in the order it received. so commands won't disappear from the queue due to JVCs PJ server requiring the handshake. It uses a single persistent connection so any delay you see is because of their menu processing. In my experience it is noticably faster than IR control, ex. I can run about 10 commands per second.
 
 Note: JVC projectors currently only support a single network connection at a time. If you're running other control systems or attempt to run the JVC AutoCal software, keep in mind you can only have one control system connected at a time.
 
-Note: Only NX and NZ series are officially supported.
-
 ## Installation
 
-This is currently only a custom component. Unlikely to make it into HA core because their process is just too burdensome and I strongly disagree with their deployment model for integrations.
+This is a custom component.
 
 Install HACS, then install the component by adding this as a custom repo
 https://hacs.xyz/docs/faq/custom_repositories
@@ -37,13 +38,9 @@ remote:
     name: { entity name }
     password: { password } (optional for non-NZ)
     host: { IP addr }
-    timeout: { seconds } (optional defaults to 3)
-    scan_interval: 15 # recommend 15-30. Attributes will poll in this interval
 ```
 
-If you set your scan interval too small you will get update errors because JVC projectors only accept a single command at a time so async is not possible. 
-
-You can use the attributes in sensors, automations, etc.
+You can use the remote entity attributes in sensors, automations, etc.
 
 ### Adding attributes as sensors
 
@@ -268,201 +265,4 @@ ThreeD
         sbs
         ou
         2d
-```
-
-## Useful Stuff
-
-I used this to re-create the JVC remote in HA. Add the YAML to your dashboard to get a grid which resembles most of the remote. Other functions can be used via remote.send_command. See the library readme for details.
-
-Add this sensor to your configuration.yml. Replace the nz7 with the name of your entity. Restart HA.
-
-### Automating HDR modes per Harmony activity
-```yaml
-alias: JVC - HDR PM Automation
-description: ""
-trigger:
-  - platform: state
-    entity_id:
-      - remote.nz7
-    attribute: content_type
-condition:
-  - condition: not
-    conditions:
-      - condition: state
-        entity_id: remote.nz7
-        attribute: content_type
-        state: sdr
-action:
-  - if:
-      - condition: state
-        entity_id: select.harmony_hub_2_activities
-        state: Game
-    then:
-      - service: remote.send_command
-        data:
-          command: picture_mode,hdr10
-mode: single
-
-```
-
-### Remote in UI
-```yaml
-sensor:
-- platform: template
-  sensors:
-    jvc_low_latency:
-      value_template: >
-        {% if is_state('remote.nz7', 'on') %}
-          {% if states.remote.nz7.attributes.low_latency == false %}
-            Off
-          {% elif states.remote.nz7.attributes.low_latency == true %}
-            On
-          {% endif %}
-        {% else %}
-            Off
-        {% endif %}
-```
-
-Add this to lovelace
-
-```yaml
-square: false
-columns: 3
-type: grid
-cards:
-  - type: button
-    name: Power
-    show_icon: false
-    entity: remote.nz7
-    show_state: true
-    show_name: true
-    icon: mdi:power
-  - type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu,up
-      target:
-        entity_id: remote.nz7
-    show_name: false
-    show_icon: true
-    icon: mdi:arrow-up
-    hold_action:
-      action: none
-  - type: button
-    tap_action:
-      action: none
-    show_icon: false
-    entity: sensor.jvc_low_latency
-    show_name: true
-    show_state: true
-    name: Low Latency
-    hold_action:
-      action: none
-  - type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu,left
-      target:
-        entity_id: remote.nz7
-    show_name: false
-    icon: mdi:arrow-left
-  - show_name: false
-    show_icon: true
-    type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu, ok
-      target:
-        entity_id: remote.nz7
-    name: OK
-    icon: mdi:checkbox-blank-circle
-    show_state: true
-  - type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu, right
-      target:
-        entity_id: remote.nz7
-    show_name: false
-    icon: mdi:arrow-right
-  - type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu,back
-      target:
-        entity_id: remote.nz7
-    name: Back
-    show_icon: false
-  - type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu,down
-      target:
-        entity_id: remote.nz7
-    show_name: false
-    icon: mdi:arrow-down
-  - type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: menu,menu
-      target:
-        entity_id: remote.nz7
-    show_name: true
-    show_icon: false
-    name: Menu
-    hold_action:
-      action: none
-  - show_name: true
-    show_icon: true
-    type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: installation_mode,mode5
-      target:
-        entity_id: remote.nz7
-    name: '17:9'
-    icon: mdi:television
-    show_state: false
-  - show_name: true
-    show_icon: true
-    type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: installation_mode,mode4
-      target:
-        entity_id: remote.nz7
-    name: 2.4:1
-    icon: mdi:television
-    show_state: false
-  - show_name: true
-    show_icon: true
-    type: button
-    tap_action:
-      action: call-service
-      service: remote.send_command
-      service_data:
-        command: installation_mode,mode2
-      target:
-        entity_id: remote.nz7
-    name: IMAX
-    icon: mdi:television
-    show_state: false
 ```
