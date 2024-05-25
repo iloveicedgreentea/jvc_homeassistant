@@ -183,7 +183,7 @@ class JVCRemote(RemoteEntity):
                         "signal_status": self.jvc_client.get_source_status(),
                     }
                 )
-                if self._attributes["signal_status"] == "signal":
+                if self._attributes.get("signal_status") == "signal":
                     self._attributes.update(
                         {
                             "content_type": self.jvc_client.get_content_type(),
@@ -209,7 +209,7 @@ class JVCRemote(RemoteEntity):
     def _update_hdr_attributes(self):
         """Update HDR-related attributes."""
         try:
-            if any(x in self._attributes["content_type_trans"] for x in ["hdr", "hlg"]):
+            if any(x in self._attributes.get("content_type_trans") for x in ["hdr", "hlg"]):
                 if "NZ" in self._model_family:
                     self._attributes["theater_optimizer"] = (
                         self.jvc_client.get_theater_optimizer_state()
