@@ -166,6 +166,10 @@ class JVCRemote(RemoteEntity):
                     "input_mode": self.jvc_client.get_input_mode(),
                 }
             )
+        except TimeoutError as e:
+            _LOGGER.error("Timeout while updating common attributes: %s", e)
+        except TypeError as e:
+            _LOGGER.debug("Type error while updating common attributes: %s", e)
         except Exception as e:
             _LOGGER.error("Failed to update common attributes: %s", e)
 
@@ -203,13 +207,17 @@ class JVCRemote(RemoteEntity):
                 self._attributes["lamp_power"] = self.jvc_client.get_lamp_power()
         except TimeoutError as e:
             _LOGGER.error("Timeout while updating model-specific attributes: %s", e)
+        except TypeError as e:
+            _LOGGER.debug("Type error while updating model-specific attributes: %s", e)
         except Exception as e:
             _LOGGER.error("Failed to update model-specific attributes: %s", e)
 
     def _update_hdr_attributes(self):
         """Update HDR-related attributes."""
         try:
-            if any(x in self._attributes.get("content_type_trans") for x in ["hdr", "hlg"]):
+            if any(
+                x in self._attributes.get("content_type_trans") for x in ["hdr", "hlg"]
+            ):
                 if "NZ" in self._model_family:
                     self._attributes["theater_optimizer"] = (
                         self.jvc_client.get_theater_optimizer_state()
@@ -223,6 +231,8 @@ class JVCRemote(RemoteEntity):
                 )
         except TimeoutError as e:
             _LOGGER.error("Timeout while updating HDR attributes: %s", e)
+        except TypeError as e:
+            _LOGGER.debug("Type error while updating HDR attributes: %s", e)
         except Exception as e:
             _LOGGER.error("Failed to update HDR attributes: %s", e)
 
