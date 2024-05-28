@@ -3,12 +3,12 @@ This is archived because I am dedicating my efforts to creating essentially Home
 
 If you have issues, switch to the "official" JVC integration. It doesn't have every feature and attribute at the moment though.
 
-This is the Home Assistant JVC Component implementing my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_improved)
+This is a Home Assistant JVC Custom Component implementing my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_python)
 
 
 ## Features
 
-All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_improved) including:
+All the features in my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_python) including:
 
 - Power
 - Picture Modes
