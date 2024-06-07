@@ -185,9 +185,11 @@ class JVCRemote(RemoteEntity):
                         "input_level": self.jvc_client.get_input_level(),
                         "mask_mode": self.jvc_client.get_mask_mode(),
                         "signal_status": self.jvc_client.get_source_status(),
+                        "resolution": self.jvc_client.get_source_display(),
+                        "anamorphic_mode": self.jvc_client.get_anamorphic(),
                     }
                 )
-                if self._attributes.get("signal_status") == "signal":
+                if self._attributes.get("signal_status"):
                     self._attributes.update(
                         {
                             "content_type": self.jvc_client.get_content_type(),
@@ -201,6 +203,7 @@ class JVCRemote(RemoteEntity):
                     {
                         "laser_mode": self.jvc_client.get_laser_mode(),
                         "laser_power": self.jvc_client.get_laser_power(),
+                        "laser_value": self.jvc_client.get_laser_value(),
                     }
                 )
             else:

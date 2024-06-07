@@ -4,7 +4,7 @@
   "config_flow": false,
   "documentation": "https://www.home-assistant.io/integrations/jvc_projector",
   "requirements": [
-    "pyjvc==3.7.7"
+    "pyjvc==3.7.8"
   ],
   "ssdp": [],
   "zeroconf": [],
