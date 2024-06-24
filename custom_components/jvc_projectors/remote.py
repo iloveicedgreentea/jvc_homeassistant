@@ -180,6 +180,7 @@ class JVCRemote(RemoteEntity):
                 self._attributes.update(
                     {
                         "installation_mode": self.jvc_client.get_install_mode(),
+                        "picture_mode": self.jvc_client.get_picture_mode(),
                         "aspect_ratio": self.jvc_client.get_aspect_ratio(),
                         "color_mode": self.jvc_client.get_color_mode(),
                         "input_level": self.jvc_client.get_input_level(),
@@ -187,6 +188,8 @@ class JVCRemote(RemoteEntity):
                         "signal_status": self.jvc_client.get_source_status(),
                         "resolution": self.jvc_client.get_source_display(),
                         "anamorphic_mode": self.jvc_client.get_anamorphic(),
+                        "firmware_version": self.jvc_client.get_software_version(),
+                        "low_latency": self.jvc_client.is_ll_on(),
                     }
                 )
                 if self._attributes.get("signal_status"):
@@ -204,10 +207,12 @@ class JVCRemote(RemoteEntity):
                         "laser_mode": self.jvc_client.get_laser_mode(),
                         "laser_power": self.jvc_client.get_laser_power(),
                         "laser_value": self.jvc_client.get_laser_value(),
+                        "laser_time": self.jvc_client.get_lamp_time(),
                     }
                 )
             else:
                 self._attributes["lamp_power"] = self.jvc_client.get_lamp_power()
+                self._attributes["lamp_time"] = self.jvc_client.get_lamp_time()
         except TimeoutError as e:
             _LOGGER.error("Timeout while updating model-specific attributes: %s", e)
         except TypeError as e:
