@@ -2,31 +2,61 @@
 
 from collections.abc import Iterable
 import logging
-import asyncio
-from dataclasses import asdict
-from typing import Callable
-import datetime
-import itertools
+import threading
+from jvc_projector.jvc_projector import JVCProjector
+import voluptuous as vol
 
-from jvc_projector.jvc_projector import JVCInput, JVCProjectorCoordinator, Header
-from homeassistant.helpers.event import async_track_time_interval
-
-from .const import DOMAIN
-
-from homeassistant.components.remote import RemoteEntity
+from homeassistant.components.remote import PLATFORM_SCHEMA, RemoteEntity
 from homeassistant.const import (
+    CONF_HOST,
     CONF_NAME,
+    CONF_PASSWORD,
+    CONF_TIMEOUT,
 )
 from homeassistant.core import HomeAssistant
-
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(funcName)s - Line: %(lineno)d",
-)
 _LOGGER = logging.getLogger(__name__)
+
+# Validation of the user's configuration
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
+    {
+        vol.Required(CONF_NAME): cv.string,
+        vol.Required(CONF_HOST): cv.string,
+        vol.Optional(CONF_PASSWORD): cv.string,
+    }
+)
+
+
+def setup_platform(
+    hass: HomeAssistant,
+    config: ConfigType,
+    add_entities: AddEntitiesCallback,
+    discovery_info: DiscoveryInfoType = None,
+) -> None:
+    """Set up platform."""
+    host = config.get(CONF_HOST)
+    name = config.get(CONF_NAME)
+    password = config.get(CONF_PASSWORD)
+    jvc_client = JVCProjector(
+        host=host,
+        password=password,
+        logger=_LOGGER,
+        connect_timeout=int(config.get(CONF_TIMEOUT, 3)),
+    )
+    # create a long lived connection
+    s = jvc_client.open_connection()
+    if not s:
+        _LOGGER.error("Failed to connect to the projector")
+        return
+    add_entities(
+        [
+            JVCRemote(name, host, jvc_client),
+        ]
+    )
+    _LOGGER.debug("JVC platform loaded")
 
 
 class JVCRemote(RemoteEntity):
@@ -34,232 +64,37 @@ class JVCRemote(RemoteEntity):
 
     def __init__(
         self,
-        hass: HomeAssistant,
-        entry,
         name: str,
-        options: JVCInput,
-        jvc_client: JVCProjectorCoordinator = None,
+        host: str,
+        jvc_client: JVCProjector = None,
     ) -> None:
         """JVC Init."""
-        super().__init__()
         self._name = name
-        self._host = options.host
-        self.entry = entry
-        # tie the entity to the config flow
-        self._attr_unique_id = entry.entry_id
-
+        self._host = host
         self.jvc_client = jvc_client
-        self.jvc_client.logger = _LOGGER
+        self.lock = threading.Lock()
+
         # attributes
         self._state = False
+        self._model_family = self.jvc_client.model_family
+        self._attributes = {
+            "power_state": self._state,
+            "model": self._model_family,
+        }
 
-        # async queue
-        self.tasks = []
-        # use one queue for all commands
-        self.command_queue = asyncio.PriorityQueue()
-        self.attribute_queue = asyncio.Queue()
+    async def async_added_to_hass(self):
+        """Call when entity is added to hass."""
+        _LOGGER.info("JVCRemote entity added to hass: %s", self._name)
 
-        self.stop_processing_commands = asyncio.Event()
-
-        self.hass = hass
-        self._update_interval = None
-
-        # counter for unique IDs
-        self._counter = itertools.count()
-
-    async def async_added_to_hass(self) -> None:
-        """Run when entity about to be added to hass."""
-        # add the queue handler to the event loop
-        # get updates in a set interval
-        self._update_interval = async_track_time_interval(
-            self.hass, self.async_update_state, datetime.timedelta(seconds=5)
-        )
-        # open connection
-        _LOGGER.debug("adding conection to loop")
-        conn = self.hass.loop.create_task(self.open_conn())
-        self.tasks.append(conn)
-
-        # handle commands
-        _LOGGER.debug("adding queue handler to loop")
-        queue_handler = self.hass.loop.create_task(self.handle_queue())
-        self.tasks.append(queue_handler)
-
-        # handle updates
-        _LOGGER.debug("adding update handler to loop")
-        update_handler = self.hass.loop.create_task(self.update_worker())
-        self.tasks.append(update_handler)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """close the connection and cancel all tasks when the entity is removed"""
-        # close connection
-        # stop scheduled updates
-        if self._update_interval:
-            self._update_interval()
-            self._update_interval = None
-
-        await self.jvc_client.close_connection()
-        # cancel all tasks
-        for task in self.tasks:
-            if not task.done():
-                task.cancel()
-
-    async def open_conn(self):
-        """Open the connection to the projector."""
-        _LOGGER.debug("About to open connection with jvc_client: %s", self.jvc_client)
-        try:
-            _LOGGER.debug("Opening connection to %s", self.host)
-            res = await asyncio.wait_for(self.jvc_client.open_connection(), timeout=3)
-            if res:
-                _LOGGER.debug("Connection to %s opened", self.host)
-                return True
-        except asyncio.TimeoutError:
-            _LOGGER.warning("Timeout while trying to connect to %s", self._host)
-        except asyncio.CancelledError:
-            return
-        # intentionally broad
-        except TypeError as err:
-            # this is benign, just means the PJ is not connected yet
-            _LOGGER.debug("open_connection: %s", err)
-            return
-        except Exception as err:
-            _LOGGER.error("some error happened with open_connection: %s", err)
-        await asyncio.sleep(5)
-
-    async def generate_unique_id(self) -> int:
-        """this is used to sort the queue because it contains non-comparable items"""
-        return next(self._counter)
-
-    async def handle_queue(self):
-        """
-        Handle items in command queue.
-        This is run in an event loop
-        """
-        while True:
-            if not self.jvc_client.connection_open:
-                _LOGGER.debug("Connection is closed not processing commands")
-                await asyncio.sleep(5)
-                continue
-            try:
-                # send all commands in queue
-                _LOGGER.debug("processing commands")
-                # can be a command or a tuple[function, attribute]
-                # first item is the priority
-                try:
-                    priority, item = await asyncio.wait_for(
-                        self.command_queue.get(), timeout=5
-                    )
-                except asyncio.TimeoutError:
-                    _LOGGER.debug("Timeout in command queue")
-                    continue
-                _LOGGER.debug("got queue item %s with priority %s", item, priority)
-                # if its a 3 its an attribute tuple
-                if len(item) == 3:
-                    # discard the unique ID
-                    _, getter, attribute = item
-                    _LOGGER.debug(
-                        "trying attribute %s with getter %s", attribute, getter
-                    )
-                    try:
-                        value = await asyncio.wait_for(getter(), timeout=3)
-                    except asyncio.TimeoutError:
-                        _LOGGER.debug("Timeout with item %s", item)
-                        try:
-                            self.command_queue.task_done()
-                        except ValueError:
-                            pass
-                        continue
-                    _LOGGER.debug("got value %s for attribute %s", value, attribute)
-                    setattr(self.jvc_client.attributes, attribute, value)
-                    self.async_write_ha_state()
-                elif len(item) == 2:
-                    # run the item and set type to operation
-                    # HA sends commands like ["power, on"] which is one item
-                    _, command = item
-                    _LOGGER.debug("executing command %s", command)
-                    try:
-                        await asyncio.wait_for(
-                            self.jvc_client.exec_command(
-                                command, Header.operation.value
-                            ),
-                            timeout=5,
-                        )
-                    except asyncio.TimeoutError:
-                        _LOGGER.debug("Timeout with command %s", command)
-                        try:
-                            self.command_queue.task_done()
-                        except ValueError:
-                            pass
-                        continue
-                try:
-                    self.command_queue.task_done()
-                except ValueError:
-                    pass
-                await asyncio.sleep(0.1)
-                # if we are stopping and the queue is not empty, clear it
-                # this is so it doesnt continuously print the stopped processing commands message
-                if (
-                    self.stop_processing_commands.is_set()
-                    and not self.command_queue.empty()
-                ):
-                    await self.clear_queue()
-                    _LOGGER.debug("Stopped processing commands")
-                    # break to the outer loop so it can restart itself if needed
-                    break
-                # save cpu
-                await asyncio.sleep(0.1)
-            except asyncio.CancelledError:
-                _LOGGER.debug("handle_queue cancelled")
-                return
-            except TypeError as err:
-                _LOGGER.debug("TypeError in handle_queue, moving on: %s -- %s", err, item)
-                # in this case likely the queue priority is the same, lets just skip it
-                self.command_queue.task_done()
-                continue
-            except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.error("Unhandled exception in handle_queue: %s", err)
-                await asyncio.sleep(5)
-
-    async def clear_queue(self):
-        """Clear the queue"""
-        try:
-            # clear the queue
-            while not self.command_queue.empty():
-                self.command_queue.get_nowait()
-                self.command_queue.task_done()
-
-            while not self.attribute_queue.empty():
-                self.attribute_queue.get_nowait()
-                self.attribute_queue.task_done()
-            # reset the counter
-            self._counter = itertools.count()
-        except ValueError:
-            pass
-
-    async def update_worker(self):
-        """Gets a function and attribute from a queue and adds it to the command interface"""
-        while True:
-            # this is just an async interface so the other processor doesnt become complicated
-
-            # getter will be a Callable
-            try:
-                unique_id, getter, attribute = await self.attribute_queue.get()
-                # add to the command queue with a single interface
-                await self.command_queue.put((1, (unique_id, getter, attribute)))
-                try:
-                    self.attribute_queue.task_done()
-                except ValueError:
-                    pass
-            except asyncio.TimeoutError:
-                _LOGGER.debug("Timeout in update_worker")
-            except asyncio.CancelledError:
-                _LOGGER.debug("update_worker cancelled")
-                return
-            await asyncio.sleep(0.1)
+    async def async_will_remove_from_hass(self):
+        """Call when entity will be removed from hass."""
+        _LOGGER.info("JVCRemote entity will be removed from hass: %s", self._name)
+        self.jvc_client.close_connection()
 
     @property
     def should_poll(self):
         """Poll."""
-        return False
+        return True
 
     @property
     def name(self):
@@ -275,213 +110,144 @@ class JVCRemote(RemoteEntity):
     def extra_state_attributes(self):
         """Return extra state attributes."""
         # Separate views for models to be cleaner
-        if self._state:
-            all_attr = asdict(self.jvc_client.attributes)
-            # remove lamp stuff if its a laser
-            if "NZ" in self.jvc_client.model_family:
-                all_attr.pop("lamp_power")
-                all_attr.pop("lamp_time")
 
-            return all_attr
-
-        return {
-            "power_state": self._state,
-            "model": self.jvc_client.model_family,
-            "connection_state": self.jvc_client.attributes.connection_active,
-        }
+        return self._attributes
 
     @property
     def is_on(self):
         """Return the last known state of the projector."""
+
         return self._state
 
-    async def async_turn_on(self, **kwargs):  # pylint: disable=unused-argument
+    def turn_on(self, **kwargs):
         """Send the power on command."""
 
-        self._state = True
+        with self.lock:
+            try:
+                self.jvc_client.power_on()
+                self._state = True
+                self._attributes["power_state"] = self._state
+            except Exception as e:
+                _LOGGER.error("Failed to turn on the projector: %s", e)
 
-        try:
-            await self.jvc_client.power_on()
-            self.stop_processing_commands.clear()
-            # save state
-        except Exception as err:  # pylint: disable=broad-except
-            _LOGGER.error("Error turning on projector: %s", err)
-            self._state = False
-        finally:
-            self.async_write_ha_state()
-
-    async def async_turn_off(self, **kwargs):  # pylint: disable=unused-argument
+    def turn_off(self, **kwargs):
         """Send the power off command."""
 
-        self._state = False
+        with self.lock:
+            try:
+                self.jvc_client.power_off()
+                self._state = False
+                self._attributes["power_state"] = self._state
+            except Exception as e:
+                _LOGGER.error("Failed to turn off the projector: %s", e)
 
-        try:
-            await self.jvc_client.power_off()
-            self.stop_processing_commands.set()
-            await self.clear_queue()
-            self.jvc_client.attributes.connection_active = False
-            # save state
-        except Exception as err:  # pylint: disable=broad-except
-            _LOGGER.error("Error turning off projector: %s", err)
-            self._state = False
-        finally:
-            self.async_write_ha_state()
-
-    async def make_updates(self, attribute_getters: list[tuple[Callable, str]]):
-        """Add all the attribute getters to the queue."""
-        for getter, name in attribute_getters:
-            # you might be thinking why is this here?
-            # oh boy let me tell you
-            # TLDR priority queues need a unique ID to sort and you need to just dump one in
-            # otherwise you get a TypeError that home assistant HIDES from you and you spend a week figuring out
-            # why this function deadlocks for no reason, and that HA hides error raises
-            # because the underlying items are not sortable
-            unique_id = await self.generate_unique_id()
-            await self.attribute_queue.put((unique_id, getter, name))
-
-        # wait for attributes to be received
-        await self.attribute_queue.join()
-        # extra sleep to make sure all the updates are done
-        await asyncio.sleep(0.5)
-
-    async def async_update_state(self, _):
+    def update(self):
         """Retrieve latest state."""
-        if self.jvc_client.connection_open is True:
-            # certain commands can only run at certain times
-            # if they fail (i.e grayed out on menu) JVC will simply time out. Bad UX
-            # have to add specific commands in a precise order
-            attribute_getters = []
-            # get power
-            attribute_getters.append((self.jvc_client.is_on, "power_state"))
-            await self.make_updates(attribute_getters)
+        with self.lock:
+            try:
+                self._state = self.jvc_client.is_on()
+                self._attributes["power_state"] = self._state
 
-            self._state = self.jvc_client.attributes.power_state
-            _LOGGER.debug("power state is : %s", self._state)
+                if self._state:
+                    self._update_common_attributes()
+                    self._update_model_specific_attributes()
+                    self._update_hdr_attributes()
 
-            if self._state:
-                _LOGGER.debug("getting signal status and picture mode")
-                # takes a func and an attribute to write result into
-                attribute_getters.extend(
-                    [
-                        (self.jvc_client.get_source_status, "signal_status"),
-                        (self.jvc_client.get_picture_mode, "picture_mode"),
-                        (self.jvc_client.get_software_version, "software_version"),
-                    ]
+            except Exception as e:
+                _LOGGER.error("Failed to update the projector state: %s", e)
+
+    def _update_common_attributes(self):
+        """Update common attributes."""
+        try:
+            self._attributes.update(
+                {
+                    "low_latency": self.jvc_client.is_ll_on(),
+                    "picture_mode": self.jvc_client.get_picture_mode(),
+                    "input_mode": self.jvc_client.get_input_mode(),
+                }
+            )
+        except TimeoutError as e:
+            _LOGGER.error("Timeout while updating common attributes: %s", e)
+        except TypeError as e:
+            _LOGGER.debug("Type error while updating common attributes: %s", e)
+        except Exception as e:
+            _LOGGER.error("Failed to update common attributes: %s", e)
+
+    def _update_model_specific_attributes(self):
+        """Update model-specific attributes."""
+        try:
+            if "Unsupported" not in self._model_family:
+                self._attributes.update(
+                    {
+                        "installation_mode": self.jvc_client.get_install_mode(),
+                        "picture_mode": self.jvc_client.get_picture_mode(),
+                        "aspect_ratio": self.jvc_client.get_aspect_ratio(),
+                        "color_mode": self.jvc_client.get_color_mode(),
+                        "input_level": self.jvc_client.get_input_level(),
+                        "mask_mode": self.jvc_client.get_mask_mode(),
+                        "signal_status": self.jvc_client.get_source_status(),
+                        "resolution": self.jvc_client.get_source_display(),
+                        "anamorphic_mode": self.jvc_client.get_anamorphic(),
+                        "firmware_version": self.jvc_client.get_software_version(),
+                        "low_latency": self.jvc_client.is_ll_on(),
+                    }
                 )
-                # determine how to proceed based on above
-                await self.make_updates(attribute_getters)
-                if self.jvc_client.attributes.signal_status is True:
-                    _LOGGER.debug("getting content type and input mode")
-                    attribute_getters.extend(
-                        [
-                            (self.jvc_client.get_content_type, "content_type"),
-                            (
-                                self.jvc_client.get_content_type_trans,
-                                "content_type_trans",
-                            ),
-                            (self.jvc_client.get_input_mode, "input_mode"),
-                            (self.jvc_client.get_anamorphic, "anamorphic_mode"),
-                            (self.jvc_client.get_source_display, "resolution"),
-                        ]
+                if self._attributes.get("signal_status"):
+                    self._attributes.update(
+                        {
+                            "content_type": self.jvc_client.get_content_type(),
+                            "content_type_trans": self.jvc_client.get_content_type_trans(),
+                        }
                     )
-                if "Unsupported" not in self.jvc_client.model_family:
-                    attribute_getters.extend(
-                        [
-                            (self.jvc_client.get_install_mode, "installation_mode"),
-                            (self.jvc_client.get_aspect_ratio, "aspect_ratio"),
-                            (self.jvc_client.get_color_mode, "color_mode"),
-                            (self.jvc_client.get_input_level, "input_level"),
-                            (self.jvc_client.get_mask_mode, "mask_mode"),
-                        ]
-                    )
-                if any(x in self.jvc_client.model_family for x in ["NX9", "NZ"]):
-                    attribute_getters.append(
-                        (self.jvc_client.get_eshift_mode, "eshift"),
-                    )
-                if "NZ" in self.jvc_client.model_family:
-                    attribute_getters.extend(
-                        [
-                            (self.jvc_client.get_laser_power, "laser_power"),
-                            (self.jvc_client.get_laser_mode, "laser_mode"),
-                            (self.jvc_client.is_ll_on, "low_latency"),
-                            (self.jvc_client.get_lamp_time, "laser_time"),
-                        ]
-                    )
-                else:
-                    attribute_getters.extend(
-                        [
-                            (self.jvc_client.get_lamp_power, "lamp_power"),
-                            (self.jvc_client.get_lamp_time, "lamp_time"),
-                        ]
-                    )
-
-                await self.make_updates(attribute_getters)
-
-                # get laser value if fw is a least 3.0
-                if "NZ" in self.jvc_client.model_family:
-                    try:
-                        if float(self.jvc_client.attributes.software_version) >= 3.00:
-                            attribute_getters.extend(
-                                [
-                                    (self.jvc_client.get_laser_value, "laser_value"),
-                                ]
-                            )
-                    except ValueError:
-                        pass
-                # HDR stuff
-                if any(
-                    x in self.jvc_client.attributes.content_type_trans
-                    for x in ["hdr", "hlg"]
-                ):
-                    if "NZ" in self.jvc_client.model_family:
-                        attribute_getters.append(
-                            (
-                                self.jvc_client.get_theater_optimizer_state,
-                                "theater_optimizer",
-                            ),
-                        )
-                    attribute_getters.extend(
-                        [
-                            (self.jvc_client.get_hdr_processing, "hdr_processing"),
-                            (self.jvc_client.get_hdr_level, "hdr_level"),
-                            (self.jvc_client.get_hdr_data, "hdr_data"),
-                        ]
-                    )
-
-                # get all the updates
-                await self.make_updates(attribute_getters)
+            if "NX9" in self._model_family or "NZ" in self._model_family:
+                self._attributes["eshift"] = self.jvc_client.get_eshift_mode()
+            if "NZ" in self._model_family:
+                self._attributes.update(
+                    {
+                        "laser_mode": self.jvc_client.get_laser_mode(),
+                        "laser_power": self.jvc_client.get_laser_power(),
+                        "laser_value": self.jvc_client.get_laser_value(),
+                        "laser_time": self.jvc_client.get_lamp_time(),
+                    }
+                )
             else:
-                _LOGGER.debug("PJ is off")
-            # set the model and power
-            self.jvc_client.attributes.model = self.jvc_client.model_family
-            self.async_write_ha_state()
+                self._attributes["lamp_power"] = self.jvc_client.get_lamp_power()
+                self._attributes["lamp_time"] = self.jvc_client.get_lamp_time()
+        except TimeoutError as e:
+            _LOGGER.error("Timeout while updating model-specific attributes: %s", e)
+        except TypeError as e:
+            _LOGGER.debug("Type error while updating model-specific attributes: %s", e)
+        except Exception as e:
+            _LOGGER.error("Failed to update model-specific attributes: %s", e)
 
-    async def async_send_command(self, command: Iterable[str], **kwargs):
+    def _update_hdr_attributes(self):
+        """Update HDR-related attributes."""
+        try:
+            if any(
+                x in self._attributes.get("content_type_trans") for x in ["hdr", "hlg"]
+            ):
+                if "NZ" in self._model_family:
+                    self._attributes["theater_optimizer"] = (
+                        self.jvc_client.get_theater_optimizer_state()
+                    )
+                self._attributes.update(
+                    {
+                        "hdr_processing": self.jvc_client.get_hdr_processing(),
+                        "hdr_level": self.jvc_client.get_hdr_level(),
+                        "hdr_data": self.jvc_client.get_hdr_data(),
+                    }
+                )
+        except TimeoutError as e:
+            _LOGGER.error("Timeout while updating HDR attributes: %s", e)
+        except TypeError as e:
+            _LOGGER.debug("Type error while updating HDR attributes: %s", e)
+        except Exception as e:
+            _LOGGER.error("Failed to update HDR attributes: %s", e)
+
+    def send_command(self, command: Iterable[str], **kwargs):
         """Send commands to a device."""
-        _LOGGER.debug("adding command %s to queue", command)
-        # add counter to preserve cmd order
-        unique_id = await self.generate_unique_id()
-        await self.command_queue.put((0, (unique_id, command)))
-        _LOGGER.debug("command %s added to queue with counter %s", command, unique_id)
-
-
-async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
-):
-    """Set up JVC Remote based on a config entry."""
-    # Retrieve your setup data or coordinator from hass.data
-    coordinator = hass.data[DOMAIN]
-
-    # You might need to adjust this part based on how your coordinator is structured
-    # and how it provides access to device/client information
-    name = entry.data.get(CONF_NAME)
-    options = (
-        coordinator.options
-    )  # Assuming your coordinator has an attribute 'options'
-    jvc_client = coordinator  # Assuming the coordinator acts as the client
-
-    # Setup your entities and add them
-    _LOGGER.debug("Setting up JVC Projector with options: %s", options)
-    async_add_entities(
-        [JVCRemote(hass, entry, name, options, jvc_client)], update_before_add=False
-    )
+        with self.lock:
+            try:
+                self.jvc_client.exec_command(command)
+            except Exception as e:
+                _LOGGER.error("Failed to send command %s: %s", command, e)
