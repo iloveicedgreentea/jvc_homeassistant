@@ -1,10 +1,7 @@
 # JVC Projectors Home Assistant Integration
-This is archived because I am dedicating my efforts to creating essentially Home Assistant but for home theaters specifically, in Go. 
-
-If you have issues, switch to the "official" JVC integration. It doesn't have every feature and attribute at the moment though.
-
 This is a Home Assistant JVC Custom Component implementing my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_python)
 
+Someone else made an official integration after this one, so this will remain a custom component. Unfortunately, the official integration is missing a lot of features.
 
 ## Features
 
@@ -94,6 +91,7 @@ Currently Supported Commands:
         lamp_time
         laser_mode
         laser_power
+        laser_value (0-100)
         low_latency
         mask
         menu
