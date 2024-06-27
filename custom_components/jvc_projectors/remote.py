@@ -4,6 +4,7 @@ from collections.abc import Iterable
 import logging
 import threading
 from jvc_projector.jvc_projector import JVCProjector
+from .const import CONF_NEW_MODEL
 import voluptuous as vol
 
 from homeassistant.components.remote import PLATFORM_SCHEMA, RemoteEntity
@@ -26,6 +27,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Required(CONF_NAME): cv.string,
         vol.Required(CONF_HOST): cv.string,
         vol.Optional(CONF_PASSWORD): cv.string,
+        vol.Optional(CONF_NEW_MODEL, default=False): bool,
     }
 )
 
@@ -45,6 +47,7 @@ def setup_platform(
         password=password,
         logger=_LOGGER,
         connect_timeout=int(config.get(CONF_TIMEOUT, 3)),
+        new_model=config.get(CONF_NEW_MODEL, False)
     )
     # create a long lived connection
     s = jvc_client.open_connection()

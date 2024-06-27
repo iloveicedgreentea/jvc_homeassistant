@@ -35,7 +35,10 @@ remote:
     name: { entity name }
     password: { password } (optional for non-NZ)
     host: { IP addr }
+    new_model: false | true (true if you have NZ800/900 or newer)
 ```
+
+The new_model flag is now required because JVC made a breaking change to how the password is encoded. Because I can't know the model before connecting, you have to tell the library to handle the password differently.
 
 You can use the remote entity attributes in sensors, automations, etc.
 
