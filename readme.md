@@ -1,7 +1,14 @@
 # JVC Projectors Home Assistant Integration
-This is a Home Assistant JVC Custom Component implementing my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_python)
 
-Someone else made an official integration after this one, so this will remain a custom component. Unfortunately, the official integration is missing a lot of features.
+# Archived
+> [!WARNING]  
+The latest HA release removed setup functions this integration uses. I don't have the time to rewrite this integration. Please use the offical integration from now on https://www.home-assistant.io/integrations/jvc_projector/
+
+I will eventually get around to adding features to the official one.
+
+
+
+This is a Home Assistant JVC Custom Component implementing my [JVC library](https://github.com/iloveicedgreentea/jvc_projector_python)
 
 ## Features
 
