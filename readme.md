@@ -1,5 +1,9 @@
 # JVC Projector Remote Home Assistant
 
+> [!IMPORTANT]  
+> All this code has been incorporated into the official core integration and this version no longer works with the latest release
+
+
 This is a rewrite of the JVC Integration that is in core. It adds a ton of features that were in my previous custom integration. It was originally meant to be in core, but I don't have time to deal with their review process. So this is a custom component that you can install via HACS.
 
 It is using my fork of the [core library](https://github.com/iloveicedgreentea/pyjvcprojector)
