@@ -1,0 +1,5 @@
+# Python 3.14; includes Home Assistant 2026.10.2.
+pytest-homeassistant-custom-component==0.13.373
+pytest==9.0.3
+pytest-asyncio==1.4.0
+ruff==0.17.1

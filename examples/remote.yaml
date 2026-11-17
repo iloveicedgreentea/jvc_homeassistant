@@ -1,0 +1,192 @@
+# Paste as a Manual card; replace every remote.jvc_projector with your entity ID.
+# Standard HA cards only. Holding an arrow sends a fixed 0.8-second burst.
+type: vertical-stack
+cards:
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: button
+        name: Power on
+        icon: mdi:power
+        tap_action:
+          action: perform-action
+          perform_action: remote.turn_on
+          target:
+            entity_id: remote.jvc_projector
+        hold_action:
+          action: none
+      - type: button
+        name: Standby
+        icon: mdi:power-standby
+        tap_action:
+          action: perform-action
+          perform_action: remote.turn_off
+          target:
+            entity_id: remote.jvc_projector
+        hold_action:
+          action: none
+  - type: grid
+    columns: 3
+    square: true
+    cards:
+      - type: button
+        name: Menu
+        icon: mdi:menu
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: menu
+        hold_action:
+          action: none
+      - type: button
+        name: Up
+        icon: mdi:chevron-up
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: up
+        hold_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: up
+            hold_secs: 0.8
+      - type: button
+        name: Info
+        icon: mdi:information-outline
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: info
+        hold_action:
+          action: none
+      - type: button
+        name: Left
+        icon: mdi:chevron-left
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: left
+        hold_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: left
+            hold_secs: 0.8
+      - type: button
+        name: OK
+        icon: mdi:checkbox-marked-circle-outline
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: ok
+        hold_action:
+          action: none
+      - type: button
+        name: Right
+        icon: mdi:chevron-right
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: right
+        hold_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: right
+            hold_secs: 0.8
+      - type: button
+        name: Back
+        icon: mdi:arrow-u-left-top
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: back
+        hold_action:
+          action: none
+      - type: button
+        name: Down
+        icon: mdi:chevron-down
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: down
+        hold_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: down
+            hold_secs: 0.8
+      - type: button
+        name: Hide
+        icon: mdi:eye-off-outline
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: hide
+        hold_action:
+          action: none
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: button
+        name: HDMI 1
+        icon: mdi:video-input-hdmi
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: hdmi_1
+        hold_action:
+          action: none
+      - type: button
+        name: HDMI 2
+        icon: mdi:video-input-hdmi
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.jvc_projector
+          data:
+            command: hdmi_2
+        hold_action:
+          action: none

@@ -1,0 +1,17 @@
+{
+  "domain": "jvc_projector",
+  "name": "JVC Projector",
+  "codeowners": [
+    "@iloveicedgreentea"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/iloveicedgreentea/jvc_homeassistant",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/iloveicedgreentea/jvc_homeassistant/issues",
+  "loggers": [
+    "custom_components.jvc_projector._vendor.jvcprojector"
+  ],
+  "requirements": [],
+  "version": "0.2.3"
+}

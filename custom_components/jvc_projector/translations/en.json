@@ -1,0 +1,364 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Device is already configured",
+      "already_in_progress": "Configuration flow is already in progress",
+      "unknown": "Unexpected error",
+      "wrong_device": "The connected projector does not match this integration",
+      "reauth_successful": "Reauthentication successful"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "invalid_host": "Invalid hostname or IP address",
+      "unknown": "Unexpected error"
+    },
+    "step": {
+      "reauth_confirm": {
+        "data": {
+          "password": "Password"
+        },
+        "description": "Password authentication failed",
+        "title": "Authentication expired for {name}"
+      },
+      "user": {
+        "data": {
+          "host": "Host",
+          "password": "Password",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "IP address or hostname of projector",
+          "password": "Optional password if projector is configured for one",
+          "port": "IP port of projector (default is 20554)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "jvc_eshift": {
+        "name": "eshift"
+      },
+      "jvc_low_latency_status": {
+        "name": "Low latency"
+      },
+      "jvc_power": {
+        "name": "Power"
+      },
+      "jvc_source_status": {
+        "name": "Source status"
+      }
+    },
+    "select": {
+      "anamorphic": {
+        "name": "Anamorphic",
+        "state": {
+          "a": "Mode A",
+          "b": "Mode B",
+          "c": "Mode C",
+          "d": "Mode D",
+          "off": "Off"
+        }
+      },
+      "eshift": {
+        "name": "Eshift",
+        "state": {
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "input": {
+        "name": "Input",
+        "state": {
+          "hdmi1": "HDMI 1",
+          "hdmi2": "HDMI 2"
+        }
+      },
+      "installation_mode": {
+        "name": "Installation Mode",
+        "state": {
+          "mode1": "Mode 1",
+          "mode10": "Mode 10",
+          "mode2": "Mode 2",
+          "mode3": "Mode 3",
+          "mode4": "Mode 4",
+          "mode5": "Mode 5",
+          "mode6": "Mode 6",
+          "mode7": "Mode 7",
+          "mode8": "Mode 8",
+          "mode9": "Mode 9"
+        }
+      },
+      "laser_dimming": {
+        "name": "Laser Dimming",
+        "state": {
+          "auto1": "Auto 1",
+          "auto2": "Auto 2",
+          "auto3": "Auto 3",
+          "off": "Off",
+          "low": "Low",
+          "high": "High",
+          "balanced": "Balanced"
+        }
+      },
+      "laser_power": {
+        "name": "Laser Power",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "medium": "Medium"
+        }
+      },
+      "picture_mode": {
+        "name": "Picture mode",
+        "state": {
+          "film": "Film",
+          "cinema": "Cinema",
+          "animation": "Animation",
+          "natural": "Natural",
+          "hdr10": "HDR10",
+          "thx": "THX",
+          "frameadapt_hdr": "Frame Adapt HDR",
+          "user1": "User 1",
+          "user2": "User 2",
+          "user3": "User 3",
+          "user4": "User 4",
+          "user5": "User 5",
+          "user6": "User 6",
+          "hlg": "HLG",
+          "hdr10+": "HDR10+",
+          "pana_pq": "Panasonic PQ",
+          "filmmaker": "FILMMAKER MODE",
+          "frameadapt_hdr2": "Frame Adapt HDR 2",
+          "frameadapt_hdr3": "Frame Adapt HDR 3 / HDR Vivid",
+          "vivid": "Vivid",
+          "natural_ll": "Natural (low latency)",
+          "hdr10_ll": "HDR10 (low latency)",
+          "hlg_ll": "HLG (low latency)"
+        }
+      },
+      "allm": {
+        "name": "Auto low latency mode",
+        "state": {
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "deep_black": {
+        "name": "Deep Black",
+        "state": {
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "filmmaker_auto": {
+        "name": "FILMMAKER MODE detection",
+        "state": {
+          "manual": "Manual",
+          "auto": "Automatic"
+        }
+      }
+    },
+    "sensor": {
+      "jvc_anamorphic_mode": {
+        "name": "Anamorphic mode",
+        "state": {
+          "a": "Mode A",
+          "b": "Mode B",
+          "c": "Mode C",
+          "d": "Mode D",
+          "off": "Off"
+        }
+      },
+      "jvc_clear_motion_drive": {
+        "name": "Clear motion drive",
+        "state": {
+          "high": "High",
+          "inverse_telecine": "Inverse Telecine",
+          "low": "Low",
+          "none": "None",
+          "off": "Off"
+        }
+      },
+      "jvc_color_profile": {
+        "name": "Color profile"
+      },
+      "jvc_color_space": {
+        "name": "Color space",
+        "state": {
+          "rgb": "RGB",
+          "yuv": "YUV",
+          "ycbcr422": "YCbCr 4:2:2",
+          "ycbcr444": "YCbCr 4:4:4",
+          "ycbcr420": "YCbCr 4:2:0"
+        }
+      },
+      "jvc_graphics_mode": {
+        "name": "Graphics mode",
+        "state": {
+          "high-res": "High Resolution",
+          "standard": "Standard",
+          "high-res2": "High Resolution 2",
+          "off": "Off"
+        }
+      },
+      "jvc_hdmi_color_space": {
+        "name": "HDMI color space"
+      },
+      "jvc_hdmi_input": {
+        "name": "HDMI input",
+        "state": {
+          "hdmi1": "HDMI 1",
+          "hdmi2": "HDMI 2"
+        }
+      },
+      "jvc_hdmi_input_level": {
+        "name": "HDMI input level",
+        "state": {
+          "auto": "Auto",
+          "enhanced": "Enhanced",
+          "standard": "Standard",
+          "super_white": "Super White"
+        }
+      },
+      "jvc_hdr_content_type": {
+        "name": "HDR content type",
+        "state": {
+          "auto": "Auto",
+          "hdr10": "HDR10",
+          "hlg": "HLG",
+          "none": "None",
+          "sdr": "SDR",
+          "hdr10_plus": "HDR10+"
+        }
+      },
+      "jvc_resolution": {
+        "name": "Resolution"
+      },
+      "jvc_hdr_mode": {
+        "name": "HDR mode",
+        "state": {
+          "hdr10": "HDR10",
+          "hdr10_plus": "HDR10+",
+          "hlg": "HLG",
+          "none": "None",
+          "sdr": "SDR",
+          "hdr": "HDR",
+          "smpte_st_2084": "SMPTE ST 2084 (PQ)",
+          "hybrid_log": "Hybrid Log-Gamma (HLG)"
+        }
+      },
+      "jvc_hdr_processing_mode": {
+        "name": "HDR processing",
+        "state": {
+          "static": "Static",
+          "frame": "Frame by Frame",
+          "scene": "Scene by Scene",
+          "hdr10_plus": "HDR10+"
+        }
+      },
+      "jvc_installation_mode": {
+        "name": "Installation mode"
+      },
+      "jvc_laser_dimming_mode": {
+        "name": "Laser dimming",
+        "state": {
+          "auto1": "Auto 1",
+          "auto2": "Auto 2",
+          "auto3": "Auto 3",
+          "off": "Off",
+          "low": "Low",
+          "high": "High",
+          "balanced": "Balanced"
+        }
+      },
+      "jvc_laser_power": {
+        "name": "Laser power",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "medium": "Medium"
+        }
+      },
+      "jvc_laser_time": {
+        "name": "Laser time"
+      },
+      "jvc_laser_value": {
+        "name": "Laser value"
+      },
+      "jvc_motion_enhance": {
+        "name": "Motion enhance",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "off": "Off"
+        }
+      },
+      "jvc_picture_mode": {
+        "name": "Picture mode",
+        "state": {
+          "film": "Film",
+          "cinema": "Cinema",
+          "animation": "Animation",
+          "natural": "Natural",
+          "hdr10": "HDR10",
+          "thx": "THX",
+          "frameadapt_hdr": "Frame Adapt HDR",
+          "user1": "User 1",
+          "user2": "User 2",
+          "user3": "User 3",
+          "user4": "User 4",
+          "user5": "User 5",
+          "user6": "User 6",
+          "hlg": "HLG",
+          "hdr10+": "HDR10+",
+          "pana_pq": "Panasonic PQ",
+          "filmmaker": "FILMMAKER MODE",
+          "frameadapt_hdr2": "Frame Adapt HDR 2",
+          "frameadapt_hdr3": "Frame Adapt HDR 3 / HDR Vivid",
+          "vivid": "Vivid",
+          "natural_ll": "Natural (low latency)",
+          "hdr10_ll": "HDR10 (low latency)",
+          "hlg_ll": "HLG (low latency)"
+        }
+      },
+      "jvc_power_status": {
+        "name": "Power status",
+        "state": {
+          "cooling": "Cooling",
+          "error": "Error",
+          "on": "On",
+          "standby": "Standby",
+          "warming": "Warming"
+        }
+      },
+      "jvc_deep_color": {
+        "name": "HDMI color depth",
+        "state": {
+          "8bit": "8 bit",
+          "10bit": "10 bit",
+          "12bit": "12 bit"
+        }
+      },
+      "jvc_colorimetry": {
+        "name": "HDMI colorimetry",
+        "state": {
+          "nodata": "No data",
+          "bt601": "BT.601",
+          "bt709": "BT.709",
+          "xvycc601": "xvYCC601",
+          "xvycc709": "xvYCC709",
+          "sycc601": "sYCC601",
+          "adobe_ycc601": "Adobe YCC601",
+          "adobe_rgb": "Adobe RGB",
+          "bt2020(constant_luminance)": "BT.2020 (constant luminance)",
+          "bt2020(non-constant_luminance)": "BT.2020 (non-constant luminance)",
+          "srgb": "sRGB",
+          "dci_p3_d65": "DCI-P3 D65",
+          "dci_p3_theater": "DCI-P3 theater"
+        }
+      }
+    }
+  }
+}

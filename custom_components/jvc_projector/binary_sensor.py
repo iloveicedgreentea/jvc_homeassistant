@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from jvcprojector import const
-
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -17,6 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JVCConfigEntry, JvcProjectorDataUpdateCoordinator
+from ._vendor.jvcprojector import const
 from .entity import JvcProjectorEntity
 
 
@@ -77,7 +76,7 @@ class JvcBinarySensor(JvcProjectorEntity, BinarySensorEntity):
         description: JVCBinarySensorEntityDescription,
     ) -> None:
         """Initialize the JVC Projector binary sensor."""
-        super().__init__(coordinator)
+        super().__init__(coordinator, context=description.key)
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.unique_id}_{description.key}"
 

@@ -1,6 +1,6 @@
 """Constants for the jvc_projector integration."""
 
-from jvcprojector import const
+from ._vendor.jvcprojector import const
 
 NAME = "JVC Projector"
 DOMAIN = "jvc_projector"
@@ -16,6 +16,8 @@ REMOTE_COMMANDS = {
     "back": const.REMOTE_BACK,
     "mpc": const.REMOTE_MPC,
     "hide": const.REMOTE_HIDE,
+    "hide_on": const.REMOTE_HIDE_ON,
+    "hide_off": const.REMOTE_HIDE_OFF,
     "info": const.REMOTE_INFO,
     "input": const.REMOTE_INPUT,
     "cmd": const.REMOTE_CMD,
@@ -30,6 +32,17 @@ REMOTE_COMMANDS = {
     "mode_1": const.REMOTE_MODE_1,
     "mode_2": const.REMOTE_MODE_2,
     "mode_3": const.REMOTE_MODE_3,
+    "mode_4": const.REMOTE_MODE_4,
+    "mode_5": const.REMOTE_MODE_5,
+    "mode_6": const.REMOTE_MODE_6,
+    "mode_7": const.REMOTE_MODE_7,
+    "mode_8": const.REMOTE_MODE_8,
+    "mode_9": const.REMOTE_MODE_9,
+    "mode_10": const.REMOTE_MODE_10,
+    "hdr10": const.REMOTE_HDR10,
+    "hdr10_plus": const.REMOTE_HDR10_PLUS,
+    "hlg": const.REMOTE_HLG,
+    "filmmaker": const.REMOTE_FILMMAKER,
     "lens_ap": const.REMOTE_LENS_AP,
     "gamma": const.REMOTE_GAMMA,
     "color_temp": const.REMOTE_COLOR_TEMP,

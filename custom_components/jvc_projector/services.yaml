@@ -1,0 +1,79 @@
+press_lens:
+  name: Press lens control
+  description: >-
+    Move the lens one step immediately. If the button is still pressed after
+    350 ms, start continuous movement. Call Stop lens movement on release to
+    cancel the pending hold or stop the motor. The watchdog attempts to stop
+    continuous movement after the duration, but cannot guarantee a stop if
+    connectivity is lost.
+  target:
+    entity:
+      integration: jvc_projector
+      domain: remote
+  fields:
+    direction:
+      name: Direction
+      required: true
+      selector:
+        select:
+          options:
+            - focus_near
+            - focus_far
+            - zoom_tele
+            - zoom_wide
+            - shift_left
+            - shift_right
+            - shift_up
+            - shift_down
+    duration:
+      name: Maximum continuous duration
+      description: Seconds from continuous start before the watchdog attempts to stop.
+      default: 5
+      selector:
+        number:
+          min: 0.1
+          max: 5
+          step: 0.1
+          unit_of_measurement: s
+start_lens:
+  name: Start lens movement
+  description: >-
+    Start continuous focus, zoom, or lens shift on a supported projector.
+    Call Stop lens movement when the button is released. A watchdog attempts
+    to stop after the duration, but cannot guarantee a stop if connectivity is lost.
+  target:
+    entity:
+      integration: jvc_projector
+      domain: remote
+  fields:
+    direction:
+      name: Direction
+      required: true
+      selector:
+        select:
+          options:
+            - focus_near
+            - focus_far
+            - zoom_tele
+            - zoom_wide
+            - shift_left
+            - shift_right
+            - shift_up
+            - shift_down
+    duration:
+      name: Maximum requested duration
+      description: Seconds before the watchdog attempts to stop the motor.
+      default: 5
+      selector:
+        number:
+          min: 0.1
+          max: 5
+          step: 0.1
+          unit_of_measurement: s
+stop_lens:
+  name: Stop lens movement
+  description: Cancel a pending hold or stop the active motor. Repeated stops are harmless.
+  target:
+    entity:
+      integration: jvc_projector
+      domain: remote
