@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Final
-
-from jvcprojector.projector import JvcProjector, const
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JVCConfigEntry, JvcProjectorDataUpdateCoordinator
+from ._vendor.jvcprojector import const
 from .entity import JvcProjectorEntity
 
 
@@ -20,12 +18,17 @@ from .entity import JvcProjectorEntity
 class JvcProjectorSelectDescription(SelectEntityDescription):
     """Describes JVC Projector select entities."""
 
-    command: Callable[[JvcProjector, str], Awaitable[None]]
+    models: frozenset[str] | None = None
 
 
 # these options correspond to a command and its possible values
 # note low latency is intentionally excluded because you can't just turn it on you need to meet conditions first so you should instead switch picture modes
 OPTIONS: Final[dict[str, list[str]]] = {
+    "picture_mode": [
+        name
+        for code, name in const.VAL_PICTURE_MODE.items()
+        if code not in {"1B", "1C", "1D", "1E"}
+    ],
     "input": const.VAL_FUNCTION_INPUT,
     "eshift": const.VAL_TOGGLE,
     "installation_mode": const.VAL_INSTALLATION_MODE,
@@ -35,26 +38,32 @@ OPTIONS: Final[dict[str, list[str]]] = {
 }
 
 
-# type safe command function for a select
-def create_select_command(key: str) -> Callable[[JvcProjector, str], Awaitable[None]]:
-    """Create a command function for a select."""
-
-    async def command(device: JvcProjector, option: str) -> None:
-        await device.send_command(key, option)
-
-    return command
-
-
 # create a select for each option defined
 SELECTS: Final[list[JvcProjectorSelectDescription]] = [
     JvcProjectorSelectDescription(
         key=key,
         translation_key=key,
         options=list(options),
-        command=create_select_command(key),
     )
     for key, options in OPTIONS.items()
 ]
+
+MODERN_MODELS = frozenset(const.MODERN_MODELS)
+
+SELECTS.extend(
+    JvcProjectorSelectDescription(
+        key=key,
+        translation_key=key,
+        options=list(options),
+        models=MODERN_MODELS,
+        entity_registry_enabled_default=enabled,
+    )
+    for key, options, enabled in (
+        (const.KEY_ALLM, const.VAL_TOGGLE, True),
+        (const.KEY_DEEP_BLACK, const.VAL_TOGGLE, True),
+        (const.KEY_FILMMAKER_AUTO, ["manual", "auto"], False),
+    )
+)
 
 
 async def async_setup_entry(
@@ -66,7 +75,9 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
 
     async_add_entities(
-        JvcProjectorSelectEntity(coordinator, description) for description in SELECTS
+        JvcProjectorSelectEntity(coordinator, description)
+        for description in SELECTS
+        if description.models is None or coordinator.device.model in description.models
     )
 
 
@@ -81,9 +92,13 @@ class JvcProjectorSelectEntity(JvcProjectorEntity, SelectEntity):
         description: JvcProjectorSelectDescription,
     ) -> None:
         """Initialize the entity."""
-        super().__init__(coordinator)
+        super().__init__(coordinator, context=description.key)
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.unique_id}_{description.key}"
+        if self.device.model in MODERN_MODELS:
+            raw_command = const.KEY_MAP_TO_COMMAND[description.key]
+            if values := const.MODERN_COMMAND_VALUES.get(raw_command):
+                self._attr_options = list(values.values())
 
     @property
     def current_option(self) -> str | None:
@@ -92,4 +107,7 @@ class JvcProjectorSelectEntity(JvcProjectorEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        await self.entity_description.command(self.coordinator.device, option)
+        await self.coordinator.async_execute_command(
+            lambda: self.device.send_command(self.entity_description.key, option)
+        )
+        await self.coordinator.async_request_refresh()

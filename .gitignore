@@ -1,4 +1,7 @@
 dist/
+.venv-test/
+# Official reference downloads remain local; source URLs and hashes are documented.
+/docs/specs/*.pdf
 build/
 jvc_projector_remote.egg-info/
 __pycache__

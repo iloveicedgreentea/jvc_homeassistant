@@ -1,6 +1,0 @@
-info:
-  name: "Info Button"
-  description: "Calls the Info button"
-  target:
-    entity:
-      domain: remote

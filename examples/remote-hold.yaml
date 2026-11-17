@@ -1,0 +1,134 @@
+# Optional: install custom:button-card through HACS first.
+# Paste as a Manual card and replace remote.jvc_projector throughout.
+# Hold an arrow to repeat while touching; release stops scheduling new calls.
+# Pending calls can still finish. Increase repeat (milliseconds) on slow networks.
+type: grid
+columns: 3
+square: true
+cards:
+  - type: custom:button-card
+    name: Menu
+    icon: mdi:menu
+    tap_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: menu
+  - type: custom:button-card
+    name: Up
+    icon: mdi:chevron-up
+    tap_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: up
+    hold_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: up
+      repeat: 300
+      repeat_limit: 20
+  - type: custom:button-card
+    name: Info
+    icon: mdi:information-outline
+    tap_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: info
+  - type: custom:button-card
+    name: Left
+    icon: mdi:chevron-left
+    tap_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: left
+    hold_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: left
+      repeat: 300
+      repeat_limit: 20
+  - type: custom:button-card
+    name: OK
+    icon: mdi:checkbox-marked-circle-outline
+    tap_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: ok
+  - type: custom:button-card
+    name: Right
+    icon: mdi:chevron-right
+    tap_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: right
+    hold_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: right
+      repeat: 300
+      repeat_limit: 20
+  - type: custom:button-card
+    name: Back
+    icon: mdi:arrow-u-left-top
+    tap_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: back
+  - type: custom:button-card
+    name: Down
+    icon: mdi:chevron-down
+    tap_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: down
+    hold_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: down
+      repeat: 300
+      repeat_limit: 20
+  - type: custom:button-card
+    name: Hide
+    icon: mdi:eye-off-outline
+    tap_action:
+      action: perform-action
+      perform_action: remote.send_command
+      target:
+        entity_id: remote.jvc_projector
+      data:
+        command: hide

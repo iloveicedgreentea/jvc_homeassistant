@@ -1,0 +1,18 @@
+{
+  "files_sha256": {
+    "LICENSE": "21ca61f75c823e717f7b87d0344750f7d56dc4ebbabe393c83777c27f455bdcb",
+    "__init__.py": "200275020edd95a6f695788ab95065145f4dab577dd680fce30a633ec7495853",
+    "command.py": "7e00ebad6ab082ab423c69cccb8d52fb8f05bdbfcc183a97caca3819fe48ab7c",
+    "connection.py": "a676bc2fd39b4d9f30b8215d79294be93974f7396b1f779cf21a10d8f146ef08",
+    "const.py": "f878ddef8041c2b1cec50784c794a70f4210547cb4b5a20a26a52050a38f4810",
+    "device.py": "e6510d2927b31feff0e4fca56a83b752e738e21bf1dd3c332dfab76cede5ab52",
+    "error.py": "a71a43e1a5c4f353a1602c6d406124abcd480195daf6bcb0cdb3d6110da52503",
+    "projector.py": "67675ad5f1f07db2405b57ebb19fadfe0dad3612ab95eeb731725c6af7009dd7",
+    "py.typed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "library_version": "1.2.0rc1",
+  "source_commit": "046d50497a1c05a1c5b874e6bcc5e4ded833d046",
+  "source_modified": false,
+  "source_repository": "https://github.com/iloveicedgreentea/pyjvcprojector",
+  "source_sha256": "398f676d6c14fe4ad1c6b7ce439a369178e761906afc5563f7941cbd10d58a35"
+}
